@@ -3,10 +3,11 @@
   "version": "0.1.0",
   "description": "MCP server for browsing-meta — meta-layer search intelligence wrapping SearXNG",
   "bin": {
-    "browsing-meta": "./index.js"
+    "browsing-meta": "index.js"
   },
   "files": [
-    "index.js"
+    "index.js",
+    "LICENSE"
   ],
   "keywords": [
     "mcp",
@@ -18,6 +19,6 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Im-Busy/browsing-meta"
+    "url": "git+https://github.com/Im-Busy/browsing-meta.git"
   }
 }
