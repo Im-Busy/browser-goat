@@ -1,0 +1,10 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  // Project-level OpenCode configuration for browsing-meta.
+  // Overrides workspace defaults from C:\Dev\opencode.jsonc.
+  //
+  // NOTE: Do NOT add "plugins", "mcpServers", or "skills" here.
+  // Those are workspace-level concerns in ~/.config/opencode/opencode.jsonc.
+  // Project-level opencode.jsonc should only contain $schema + comments
+  // unless you're explicitly overriding a workspace default.
+}

@@ -1,0 +1,57 @@
+[project]
+name = "browsing-meta"
+version = "0.1.0"
+description = "Meta-layer search intelligence wrapping SearXNG with pre/post processing, extraction, strategy, and verification from SearchWala, local-deep-research, Marco-DeepResearch, Tongyi-DeepResearch, and Scrapling."
+requires-python = ">=3.13"
+dependencies = [
+    "httpx>=0.28",
+    "beautifulsoup4>=4.12",
+    "lxml>=5.3",
+    "pydantic>=2.10",
+    "tenacity>=9.0",
+    "tiktoken>=0.8",
+    "playwright>=1.49",
+    "scrapling>=0.2",
+    "mcp>=1.0",
+]
+
+[project.scripts]
+browsing-meta = "browsing_meta.cli:main"
+browsing-meta-mcp = "browsing_meta.mcp_server:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.25",
+    "pytest-cov>=6.0",
+    "ruff>=0.8",
+    "mypy>=1.13",
+    "bandit>=1.8",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP", "B", "C4", "SIM"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+warn_unreachable = true
+warn_unused_ignores = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "mypy>=2.1.0",
+    "pytest>=9.1.0",
+    "pytest-asyncio>=1.4.0",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.15.17",
+]

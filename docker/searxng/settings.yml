@@ -1,0 +1,32 @@
+# SearXNG settings for browsing-meta sidecar deployment.
+# Based on upstream searxng-docker settings, adapted for agent use.
+# See: https://docs.searxng.org/admin/settings/settings.html#settings-use-default-settings
+use_default_settings: true
+
+server:
+  # base_url is set via SEARXNG_BASE_URL env var in docker-compose.yml
+  secret_key: "browsing-meta-change-this-in-production-0123456789abcdef"  # CHANGE THIS for production
+  limiter: false  # Disabled — rate limiting handled by browsing-meta, not SearXNG
+  image_proxy: true
+  # Trust all proxies for sidecar deployment
+  trusted_proxies:
+    - 0.0.0.0/0
+
+search:
+  safe_search: 0
+  default_lang: ""
+  # JSON API is required for browsing-meta integration
+  formats:
+    - html
+    - json
+
+redis:
+  # Redis service name from docker-compose.yml
+  url: redis://redis:6379/0
+
+outgoing:
+  request_timeout: 10.0
+  max_request_timeout: 15.0
+  pool_connections: 100
+  pool_maxsize: 20
+  enable_http2: true
