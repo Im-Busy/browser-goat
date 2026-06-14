@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Meta-layer search intelligence wrapping SearXNG with pre/post processing, extraction, strategy, and verification from SearchWala, local-deep-research, Marco-DeepResearch, Tongyi-DeepResearch, and Scrapling."
 requires-python = ">=3.13"
 dependencies = [
-    "httpx>=0.28",
+    "httpx[http2]>=0.28",
     "beautifulsoup4>=4.12",
     "lxml>=5.3",
     "pydantic>=2.10",
