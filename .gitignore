@@ -23,3 +23,9 @@ Thumbs.db
 
 # OMO runtime
 .omo/
+kilo.json
+opencode.jsonc
+MEMORY.md
+plans/
+docs/blueprint.md
+.python-version
