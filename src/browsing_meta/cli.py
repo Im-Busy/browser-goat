@@ -111,6 +111,25 @@ def build_parser() -> argparse.ArgumentParser:
         help="Output format (default: json)",
     )
 
+    # ── serve ──
+    serve = sub.add_parser("serve", help="Run browsing-meta as an HTTP JSON API server")
+    serve.add_argument(
+        "--host",
+        default="0.0.0.0",
+        help="Host to bind to (default: 0.0.0.0)",
+    )
+    serve.add_argument(
+        "--port",
+        type=int,
+        default=8000,
+        help="Port to listen on (default: 8000)",
+    )
+    serve.add_argument(
+        "--searxng-url",
+        default="http://localhost:8080",
+        help="SearXNG instance URL (default: http://localhost:8080)",
+    )
+
     return parser
 
 
@@ -176,6 +195,66 @@ async def cmd_verify(args: argparse.Namespace) -> None:
     print(output)
 
 
+async def cmd_serve(args: argparse.Namespace) -> None:
+    """Run browsing-meta as a minimal HTTP JSON API server (zero extra deps)."""
+    meta = BrowsingMeta(searxng_url=args.searxng_url)
+
+    async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        try:
+            raw = await asyncio.wait_for(reader.readuntil(b"\r\n\r\n"), timeout=30)
+            request_line, *_ = raw.decode("utf-8", errors="replace").split("\r\n")
+            method, path, *_ = request_line.split(" ") + ["", ""]
+
+            if method == "GET" and path in ("/health", "/"):
+                body = b'{"status":"ok"}'
+                writer.write(
+                    b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n"
+                    b"Content-Length: " + str(len(body)).encode() + b"\r\n\r\n" + body
+                )
+                await writer.drain()
+                return
+
+            if method == "POST" and path == "/search":
+                content_length = 0
+                for line in raw.decode("utf-8", errors="replace").split("\r\n"):
+                    if line.lower().startswith("content-length:"):
+                        content_length = int(line.split(":")[1].strip())
+                body_raw = await asyncio.wait_for(reader.readexactly(content_length), timeout=5)
+                params = json.loads(body_raw)
+
+                result = await meta.search(
+                    query=params.get("query", ""),
+                    time_range=params.get("time_range"),
+                    max_sources=params.get("max_sources", 15),
+                    strategy=params.get("strategy", "default"),
+                    reliability_mode=params.get("reliability", "standard"),
+                )
+                body = result.model_dump_json().encode()
+                writer.write(
+                    b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n"
+                    b"Content-Length: " + str(len(body)).encode() + b"\r\n\r\n" + body
+                )
+                await writer.drain()
+                return
+
+            body = b'{"error":"not found"}'
+            writer.write(
+                b"HTTP/1.1 404 Not Found\r\nContent-Type: application/json\r\n"
+                b"Content-Length: " + str(len(body)).encode() + b"\r\n\r\n" + body
+            )
+            await writer.drain()
+        except Exception:
+            pass
+        finally:
+            writer.close()
+            await writer.wait_closed()
+
+    server = await asyncio.start_server(handle, host=args.host, port=args.port)
+    print(f"browsing-meta API listening on http://{args.host}:{args.port}", file=sys.stderr)
+    async with server:
+        await server.serve_forever()
+
+
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
@@ -187,6 +266,8 @@ def main() -> None:
             asyncio.run(cmd_extract(args))
         elif args.command == "verify":
             asyncio.run(cmd_verify(args))
+        elif args.command == "serve":
+            asyncio.run(cmd_serve(args))
     except Exception as e:
         print(json.dumps({"error": str(e)}), file=sys.stderr)
         sys.exit(1)

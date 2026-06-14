@@ -20,8 +20,4 @@ RUN uv sync --frozen --no-dev
 # Expose the service port
 EXPOSE 8000
 
-# Placeholder: python http.server keeps container alive as sidecar.
-# TODO: Replace with `uv run browsing-meta serve --host 0.0.0.0 --port 8000`
-# once a proper serve command is added to the CLI.
-# The browsing-meta CLI is available via `docker exec browsing-meta uv run browsing-meta search "..."`.
-CMD ["uv", "run", "python", "-m", "http.server", "8000"]
+CMD ["uv", "run", "browsing-meta", "serve", "--host", "0.0.0.0", "--port", "8000"]
