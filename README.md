@@ -8,6 +8,44 @@
 
 Browsing-meta adds six processing layers to [SearXNG](https://docs.searxng.org/): intent detection, hybrid ranking, anti-bot content extraction, reliability gating, adaptive strategy, and multi-rollout verification. The result is agent-ready search output competitive with commercial APIs — running entirely on your own infrastructure.
 
+```mermaid
+flowchart TD
+    Q["Query"] --> L1
+
+    subgraph L1["1. Pre-Search"]
+        A["Intent detection<br/>Browser profiles<br/>Language detection"]
+    end
+
+    L1 --> SX["SearXNG Engine"]
+
+    SX --> L2
+    subgraph L2["2. Post-Search"]
+        B["URL normalization<br/>RRF + BM25 + MMR"]
+    end
+
+    L2 --> L3
+    subgraph L3["3. Extraction"]
+        C["7-tier cascading<br/>Anti-bot bypass<br/>Goal-oriented summary"]
+    end
+
+    L3 --> L4
+    subgraph L4["4. Reliability"]
+        D["Give-up detection<br/>Quality-gated retry<br/>Force synthesis"]
+    end
+
+    L4 --> L5
+    subgraph L5["5. Strategy"]
+        E["Query classification<br/>Adaptive exploration<br/>Recursive decomposition"]
+    end
+
+    L5 --> L6
+    subgraph L6["6. Verification"]
+        F["Multi-rollout voting<br/>Consensus verification<br/>LLM tie-breaking"]
+    end
+
+    L6 --> A["Answer"]
+```
+
 ---
 
 ## Quick Start
@@ -110,14 +148,7 @@ docker exec browsing-meta uv run browsing-meta search "your query"
 
 ## How It Works
 
-Six processing layers wrap every search:
-
-1. **Pre-Search** — Intent detection, browser profile rotation, language-aware params
-2. **Post-Search** — URL normalization, tracking param stripping, RRF+BM25+MMR ranking
-3. **Extraction** — 7-tier cascading extraction, anti-bot bypass, goal-oriented rational/evidence/summary
-4. **Reliability** — Give-up detection (43 patterns EN+ZH), quality-gated retry, force synthesis
-5. **Strategy** — Query classification, adaptive multi-angle exploration, recursive decomposition
-6. **Verification** — Multi-rollout voting, consensus verification, LLM tie-breaking
+Each search passes through six layers before returning an answer. The diagram above shows the full pipeline. Layers 1-4 run on every query; Layers 5-6 activate when `--strategy` or `--reliability` are set.
 
 ---
 
