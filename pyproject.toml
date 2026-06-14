@@ -46,6 +46,9 @@ warn_unused_ignores = true
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = [
+    "integration: end-to-end tests requiring a running SearXNG instance",
+]
 
 [dependency-groups]
 dev = [
