@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from browsing_meta.models import (
+from browser_goat.models import (
     BrowserProfile,
     CleanedResult,
     ExtractedContent,

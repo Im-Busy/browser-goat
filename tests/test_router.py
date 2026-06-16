@@ -1,4 +1,4 @@
-"""Tests for BrowsingMeta router — main search orchestrator.
+"""Tests for BrowserGoat router — main search orchestrator.
 
 ALL tests mock SearXNG and external services — no real HTTP calls.
 """
@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from browsing_meta.models import (
+from browser_goat.models import (
     ClassificationResult,
     ConfidenceLevel,
     ExtractedSource,
@@ -17,8 +17,8 @@ from browsing_meta.models import (
     SearchResult,
     VoteResult,
 )
-from browsing_meta.router import BrowsingMeta
-from browsing_meta.verification.multi_rollout import MultiRollout
+from browser_goat.router import BrowserGoat
+from browser_goat.verification.multi_rollout import MultiRollout
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -90,8 +90,8 @@ def mock_sources() -> list[ExtractedSource]:
 
 class TestInit:
     def test_creates_all_sub_components(self) -> None:
-        """BrowsingMeta() instantiates every sub-component."""
-        meta = BrowsingMeta(searxng_url="http://mock-searxng:8080")
+        """BrowserGoat() instantiates every sub-component."""
+        meta = BrowserGoat(searxng_url="http://mock-searxng:8080")
 
         # Pre-Search
         assert meta.searxng is not None
@@ -128,7 +128,7 @@ class TestInit:
 class TestDefaultSearch:
     """Tests for the Phase 1 default pipeline path."""
 
-    @patch.object(BrowsingMeta, "_extract_sources")
+    @patch.object(BrowserGoat, "_extract_sources")
     async def test_search_returns_search_result(
         self,
         mock_extract: AsyncMock,
@@ -138,7 +138,7 @@ class TestDefaultSearch:
         """search() with default params returns SearchResult with correct fields."""
         mock_extract.return_value = (mock_sources, mock_sources, 1.0)
 
-        meta = BrowsingMeta(searxng_url="http://mock-searxng:8080")
+        meta = BrowserGoat(searxng_url="http://mock-searxng:8080")
 
         with patch.object(meta.searxng, "search", new=AsyncMock(return_value=mock_raw_results)):
             result = await meta.search(query="What is Python?")
@@ -154,7 +154,7 @@ class TestDefaultSearch:
         assert result.pipeline_latency_ms >= 0
         assert result.engines_used is not None
 
-    @patch.object(BrowsingMeta, "_extract_sources")
+    @patch.object(BrowserGoat, "_extract_sources")
     async def test_search_custom_engines(
         self,
         mock_extract: AsyncMock,
@@ -164,7 +164,7 @@ class TestDefaultSearch:
         """Custom engines list is passed through to SearXNG."""
         mock_extract.return_value = (mock_sources, mock_sources, 1.0)
 
-        meta = BrowsingMeta(searxng_url="http://mock-searxng:8080")
+        meta = BrowserGoat(searxng_url="http://mock-searxng:8080")
         custom_engines = ["brave", "duckduckgo"]
 
         with patch.object(meta.searxng, "search", new=AsyncMock(return_value=mock_raw_results)) as mock_search:
@@ -175,7 +175,7 @@ class TestDefaultSearch:
         assert call_kwargs["engines"] == custom_engines
         assert result.engines_used == custom_engines
 
-    @patch.object(BrowsingMeta, "_extract_sources")
+    @patch.object(BrowserGoat, "_extract_sources")
     async def test_search_with_time_range(
         self,
         mock_extract: AsyncMock,
@@ -185,7 +185,7 @@ class TestDefaultSearch:
         """time_range parameter flows through to SearXNG."""
         mock_extract.return_value = (mock_sources, mock_sources, 1.0)
 
-        meta = BrowsingMeta(searxng_url="http://mock-searxng:8080")
+        meta = BrowserGoat(searxng_url="http://mock-searxng:8080")
 
         with patch.object(meta.searxng, "search", new=AsyncMock(return_value=mock_raw_results)) as mock_search:
             await meta.search(query="Python news", time_range="week")
@@ -193,7 +193,7 @@ class TestDefaultSearch:
         call_kwargs = mock_search.call_args.kwargs
         assert call_kwargs["time_range"] == "week"
 
-    @patch.object(BrowsingMeta, "_extract_sources")
+    @patch.object(BrowserGoat, "_extract_sources")
     async def test_search_empty_results_graceful(
         self,
         mock_extract: AsyncMock,
@@ -201,7 +201,7 @@ class TestDefaultSearch:
         """Empty results from SearXNG are handled gracefully."""
         mock_extract.return_value = ([], [], 0.0)
 
-        meta = BrowsingMeta(searxng_url="http://mock-searxng:8080")
+        meta = BrowserGoat(searxng_url="http://mock-searxng:8080")
 
         with patch.object(meta.searxng, "search", new=AsyncMock(return_value=[])):
             result = await meta.search(query="xyznonexistent12345")
@@ -219,7 +219,7 @@ class TestDefaultSearch:
 class TestStrategyAuto:
     """Tests for the strategy='auto' path."""
 
-    @patch.object(BrowsingMeta, "_extract_sources")
+    @patch.object(BrowserGoat, "_extract_sources")
     async def test_auto_calls_query_classifier(
         self,
         mock_extract: AsyncMock,
@@ -229,7 +229,7 @@ class TestStrategyAuto:
         """strategy='auto' invokes the query classifier."""
         mock_extract.return_value = (mock_sources, mock_sources, 1.0)
 
-        meta = BrowsingMeta(searxng_url="http://mock-searxng:8080")
+        meta = BrowserGoat(searxng_url="http://mock-searxng:8080")
         # Classification says "research" → should route to explore path
         mock_classify = AsyncMock(
             return_value=ClassificationResult(
@@ -258,7 +258,7 @@ class TestStrategyAuto:
 class TestStrategyDecompose:
     """Tests for the strategy='decompose' path."""
 
-    @patch.object(BrowsingMeta, "_extract_sources")
+    @patch.object(BrowserGoat, "_extract_sources")
     async def test_decompose_calls_recursive_decomposer(
         self,
         mock_extract: AsyncMock,
@@ -268,7 +268,7 @@ class TestStrategyDecompose:
         """strategy='decompose' calls recursive_decomposer.decompose_and_solve."""
         mock_extract.return_value = (mock_sources, mock_sources, 1.0)
 
-        meta = BrowsingMeta(searxng_url="http://mock-searxng:8080")
+        meta = BrowserGoat(searxng_url="http://mock-searxng:8080")
 
         with patch.object(meta.searxng, "search", new=AsyncMock(return_value=mock_raw_results)):
             result = await meta.search(
@@ -304,7 +304,7 @@ class TestReliabilityHigh:
             pipeline_latency_ms=100,
         )
 
-        meta = BrowsingMeta(searxng_url="http://mock-searxng:8080")
+        meta = BrowserGoat(searxng_url="http://mock-searxng:8080")
 
         mock_vote = VoteResult(
             consensus=True,
@@ -335,7 +335,7 @@ class TestReliabilityHigh:
 class TestEnrichQuery:
     """Tests for the query enrichment logic inside the default pipeline."""
 
-    @patch.object(BrowsingMeta, "_extract_sources")
+    @patch.object(BrowserGoat, "_extract_sources")
     async def test_enrich_query_adds_year_for_time_sensitive(
         self,
         mock_extract: AsyncMock,
@@ -345,7 +345,7 @@ class TestEnrichQuery:
         """Time-sensitive queries get a year appended via query_intel.enrich_query."""
         mock_extract.return_value = (mock_sources, mock_sources, 1.0)
 
-        meta = BrowsingMeta(searxng_url="http://mock-searxng:8080")
+        meta = BrowserGoat(searxng_url="http://mock-searxng:8080")
 
         with patch.object(meta.searxng, "search", new=AsyncMock(return_value=mock_raw_results)) as mock_search:
             await meta.search(query="latest Python releases")
@@ -355,7 +355,7 @@ class TestEnrichQuery:
         sent_query = call_args.kwargs.get("query") or call_args.args[0]
         assert "2026" in sent_query
 
-    @patch.object(BrowsingMeta, "_extract_sources")
+    @patch.object(BrowserGoat, "_extract_sources")
     async def test_enrich_query_no_duplicate_year(
         self,
         mock_extract: AsyncMock,
@@ -365,7 +365,7 @@ class TestEnrichQuery:
         """Queries already containing a year don't get a duplicate appended."""
         mock_extract.return_value = (mock_sources, mock_sources, 1.0)
 
-        meta = BrowsingMeta(searxng_url="http://mock-searxng:8080")
+        meta = BrowserGoat(searxng_url="http://mock-searxng:8080")
         query_with_year = "Python developments 2026"
 
         with patch.object(meta.searxng, "search", new=AsyncMock(return_value=mock_raw_results)) as mock_search:

@@ -1,5 +1,5 @@
 [project]
-name = "browsing-meta"
+name = "browser-goat"
 version = "0.1.0"
 description = "Meta-layer search intelligence wrapping SearXNG with pre/post processing, extraction, strategy, and verification from SearchWala, local-deep-research, Marco-DeepResearch, Tongyi-DeepResearch, and Scrapling."
 requires-python = ">=3.13"
@@ -18,8 +18,8 @@ dependencies = [
 ]
 
 [project.scripts]
-browsing-meta = "browsing_meta.cli:main"
-browsing-meta-mcp = "browsing_meta.mcp_server:main"
+browser-goat = "browser_goat.cli:main"
+browser-goat-mcp = "browser_goat.mcp_server:main"
 
 [project.optional-dependencies]
 dev = [
@@ -51,6 +51,9 @@ testpaths = ["tests"]
 markers = [
     "integration: end-to-end tests requiring a running SearXNG instance",
 ]
+
+[tool.uv]
+package = true
 
 [dependency-groups]
 dev = [

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from browsing_meta.models import ExtractedSource
-from browsing_meta.reliability.quality_gate import QualityGate
+from browser_goat.models import ExtractedSource
+from browser_goat.reliability.quality_gate import QualityGate
 
 
 def _make_source(url: str = "https://example.com", summary: str = "Test summary") -> ExtractedSource:

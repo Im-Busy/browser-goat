@@ -20,4 +20,4 @@ RUN uv sync --frozen --no-dev
 # Expose the service port
 EXPOSE 8000
 
-CMD ["uv", "run", "browsing-meta", "serve", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uv", "run", "browser-goat", "serve", "--host", "0.0.0.0", "--port", "8000"]

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from browsing_meta.extraction.content_extractor import ContentExtractor
+from browser_goat.extraction.content_extractor import ContentExtractor
 
 SAMPLE_HTML_JSON_LD = """<!DOCTYPE html>
 <html><head>

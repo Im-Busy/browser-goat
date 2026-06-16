@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from browsing_meta.models import ConfidenceLevel, ExtractedSource
-from browsing_meta.verification.llm_verifier import LLMVerifier
+from browser_goat.models import ConfidenceLevel, ExtractedSource
+from browser_goat.verification.llm_verifier import LLMVerifier
 
 
 def _make_source(url: str = "https://example.com") -> ExtractedSource:

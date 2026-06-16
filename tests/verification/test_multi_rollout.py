@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from browsing_meta.models import RolloutConfig, SearchResult
-from browsing_meta.verification.multi_rollout import MultiRollout
+from browser_goat.models import RolloutConfig, SearchResult
+from browser_goat.verification.multi_rollout import MultiRollout
 
 
 class TestGenerateConfigs:
@@ -57,7 +57,7 @@ class TestExtractAnswer:
 class TestExecute:
     @pytest.fixture
     def mock_meta(self) -> MagicMock:
-        """Create a mock BrowsingMeta-like object with async search()."""
+        """Create a mock BrowserGoat-like object with async search()."""
         meta = MagicMock()
         meta.search = AsyncMock()
         return meta

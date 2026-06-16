@@ -6,8 +6,8 @@ Tests the direct answer path (simple queries) and the decomposition path
 
 from __future__ import annotations
 
-from browsing_meta.models import DecomposedResult, RawSearchResult, SubTask
-from browsing_meta.strategy.recursive_decomposer import RecursiveDecomposer
+from browser_goat.models import DecomposedResult, RawSearchResult, SubTask
+from browser_goat.strategy.recursive_decomposer import RecursiveDecomposer
 
 
 class MockSearXNG:

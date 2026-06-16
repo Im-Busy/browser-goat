@@ -1,9 +1,9 @@
 {
-  "name": "browsing-meta",
+  "name": "browser-goat",
   "version": "0.1.0",
-  "description": "MCP server for browsing-meta — meta-layer search intelligence wrapping SearXNG",
+  "description": "MCP server for browser-goat — meta-layer search intelligence wrapping SearXNG",
   "bin": {
-    "browsing-meta": "index.js"
+    "browser-goat": "index.js"
   },
   "files": [
     "index.js",
@@ -19,6 +19,6 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Im-Busy/browsing-meta.git"
+    "url": "git+https://github.com/Im-Busy/browser-goat.git"
   }
 }

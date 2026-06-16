@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from browsing_meta.models import ExtractedSource
-from browsing_meta.reliability.force_answer import (
+from browser_goat.models import ExtractedSource
+from browser_goat.reliability.force_answer import (
     FORCE_ANSWER_PROMPT,
     build_force_answer_prompt,
     format_sources_for_prompt,

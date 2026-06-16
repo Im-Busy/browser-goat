@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from browsing_meta.models import ConfidenceLevel
-from browsing_meta.verification.answer_voter import AnswerVoter
+from browser_goat.models import ConfidenceLevel
+from browser_goat.verification.answer_voter import AnswerVoter
 
 
 class TestNormalize:

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from browsing_meta.models import QueryComplexity, QueryIntent
-from browsing_meta.pre_search.query_intel import QueryIntel
+from browser_goat.models import QueryComplexity, QueryIntent
+from browser_goat.pre_search.query_intel import QueryIntel
 
 
 class TestDetectIntent:

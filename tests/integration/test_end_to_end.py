@@ -1,6 +1,6 @@
-"""Integration tests for browsing-meta against real SearXNG.
+"""Integration tests for browser-goat against real SearXNG.
 
-These tests start browsing-meta as subprocesses (CLI, HTTP serve, MCP stdio),
+These tests start browser-goat as subprocesses (CLI, HTTP serve, MCP stdio),
 send real requests, validate responses, and clean up. They require a running
 SearXNG instance at the URL specified by SEARXNG_URL env var (default localhost:8080).
 
@@ -26,9 +26,9 @@ UV = "uv"
 
 
 def _run_cli(*args: str, timeout: int = 120) -> tuple[int, str, str]:
-    """Run browsing-meta CLI and return (exit_code, stdout, stderr)."""
+    """Run browser-goat CLI and return (exit_code, stdout, stderr)."""
     result = subprocess.run(
-        [UV, "run", "browsing-meta", *args],
+        [UV, "run", "browser-goat", *args],
         capture_output=True,
         text=True,
         encoding="utf-8",
@@ -111,7 +111,7 @@ class TestCLISearch:
 
 @pytest.mark.integration
 class TestHTTPServe:
-    """End-to-end HTTP API tests against browsing-meta serve."""
+    """End-to-end HTTP API tests against browser-goat serve."""
 
     @pytest.fixture(scope="class")
     def serve_port(self) -> int:
@@ -119,9 +119,9 @@ class TestHTTPServe:
 
     @pytest.fixture(scope="class")
     def serve_process(self, serve_port: int) -> subprocess.Popen:
-        """Start browsing-meta serve as a background subprocess."""
+        """Start browser-goat serve as a background subprocess."""
         proc = subprocess.Popen(
-            [UV, "run", "browsing-meta", "serve",
+            [UV, "run", "browser-goat", "serve",
              "--host", "127.0.0.1",
              "--port", str(serve_port),
              "--searxng-url", SEARXNG_URL],
@@ -192,7 +192,7 @@ class TestMCPServer:
 
     def test_list_tools(self) -> None:
         """Verify search and extract tools are registered on the MCP server."""
-        from browsing_meta.mcp_server import create_mcp_server
+        from browser_goat.mcp_server import create_mcp_server
 
         server = create_mcp_server(searxng_url=SEARXNG_URL)
         tool_names = {t.name for t in server._tool_manager._tools.values()}  # type: ignore[attr-defined]
@@ -201,7 +201,7 @@ class TestMCPServer:
 
     def test_search_tool_registered(self) -> None:
         """Verify search tool exists in the FastMCP tool registry."""
-        from browsing_meta.mcp_server import create_mcp_server
+        from browser_goat.mcp_server import create_mcp_server
 
         server = create_mcp_server(searxng_url=SEARXNG_URL)
         tool_names = [t.name for t in server._tool_manager._tools.values()]  # type: ignore[attr-defined]
@@ -210,7 +210,7 @@ class TestMCPServer:
 
     def test_search_tool_callable(self) -> None:
         """Verify search tool function is callable with arguments."""
-        from browsing_meta.mcp_server import create_mcp_server
+        from browser_goat.mcp_server import create_mcp_server
 
         server = create_mcp_server(searxng_url=SEARXNG_URL)
         search_fn = server._tool_manager._tools["search"].fn  # type: ignore[attr-defined]
@@ -221,7 +221,7 @@ class TestMCPServer:
 
     def test_extract_tool_callable(self) -> None:
         """Verify extract tool function is callable."""
-        from browsing_meta.mcp_server import create_mcp_server
+        from browser_goat.mcp_server import create_mcp_server
 
         server = create_mcp_server(searxng_url=SEARXNG_URL)
         extract_fn = server._tool_manager._tools["extract"].fn  # type: ignore[attr-defined]

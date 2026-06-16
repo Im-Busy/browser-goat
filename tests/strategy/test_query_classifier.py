@@ -5,8 +5,8 @@ Tests both rule-based fallback and LLM-driven classification paths.
 
 from __future__ import annotations
 
-from browsing_meta.models import ClassificationResult
-from browsing_meta.strategy.query_classifier import (
+from browser_goat.models import ClassificationResult
+from browser_goat.strategy.query_classifier import (
     COMPARISON,
     FACTUAL,
     HOWTO,

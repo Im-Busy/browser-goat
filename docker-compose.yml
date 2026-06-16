@@ -7,7 +7,7 @@ services:
     volumes:
       - valkey-data:/data
     networks:
-      - browsing-meta-net
+      - browser-goat-net
     healthcheck:
       test: ["CMD", "valkey-cli", "ping"]
       interval: 10s
@@ -18,7 +18,7 @@ services:
     image: searxng/searxng:latest
     restart: unless-stopped
     networks:
-      - browsing-meta-net
+      - browser-goat-net
     expose:
       - "8080"
     environment:
@@ -39,11 +39,11 @@ services:
       retries: 3
       start_period: 30s
 
-  browsing-meta:
+  browser-goat:
     build: .
     restart: unless-stopped
     networks:
-      - browsing-meta-net
+      - browser-goat-net
     ports:
       - "8000:8000"
     environment:
@@ -53,7 +53,7 @@ services:
         condition: service_healthy
 
 networks:
-  browsing-meta-net:
+  browser-goat-net:
     driver: bridge
 
 volumes:

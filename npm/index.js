@@ -1,22 +1,22 @@
 #!/usr/bin/env node
 
 /**
- * browsing-meta MCP server wrapper.
+ * browser-goat MCP server wrapper.
  *
- * Spawns the Python `browsing-meta-mcp` CLI as a subprocess and proxies
+ * Spawns the Python `browser-goat-mcp` CLI as a subprocess and proxies
  * stdin/stdout for MCP stdio transport. The npm package itself contains
  * no logic — it's a thin bridge to the Python backend.
  *
  * Usage:
- *   npx browsing-meta
- *   SEARXNG_URL=http://localhost:8080 npx browsing-meta
+ *   npx browser-goat
+ *   SEARXNG_URL=http://localhost:8080 npx browser-goat
  */
 
 const { spawn } = require("child_process");
 
 const searxngUrl = process.env.SEARXNG_URL || "http://localhost:8080";
 
-const args = ["-m", "browsing_meta.mcp_server", "--searxng-url", searxngUrl];
+const args = ["-m", "browser_goat.mcp_server", "--searxng-url", searxngUrl];
 const pythonCmd = process.env.PYTHON_CMD || "python";
 
 const child = spawn(pythonCmd, args, {
@@ -34,8 +34,8 @@ child.stdout.pipe(process.stdout);
 child.stderr.pipe(process.stderr);
 
 child.on("error", (err) => {
-  console.error(`[browsing-meta] Failed to start Python backend: ${err.message}`);
-  console.error(`[browsing-meta] Ensure browsing-meta is installed: pip install browsing-meta`);
+  console.error(`[browser-goat] Failed to start Python backend: ${err.message}`);
+  console.error(`[browser-goat] Ensure browser-goat is installed: pip install browser-goat`);
   process.exit(1);
 });
 

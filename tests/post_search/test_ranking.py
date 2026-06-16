@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from browsing_meta.models import CleanedResult
-from browsing_meta.post_search.ranking import HybridRanker
+from browser_goat.models import CleanedResult
+from browser_goat.post_search.ranking import HybridRanker
 
 
 def _make_result(url: str, content: str, engine: str = "google") -> CleanedResult:

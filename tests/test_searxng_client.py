@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from browsing_meta.models import (
+from browser_goat.models import (
     BrowserProfile,
 )
-from browsing_meta.searxng_client import SearXNGClient
+from browser_goat.searxng_client import SearXNGClient
 
 
 class TestSearXNGClient:

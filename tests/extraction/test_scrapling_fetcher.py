@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from browsing_meta.extraction.scrapling_fetcher import ScraplingFetcher
-from browsing_meta.models import BrowserProfile, FetchResult
+from browser_goat.extraction.scrapling_fetcher import ScraplingFetcher
+from browser_goat.models import BrowserProfile, FetchResult
 
 
 class TestScraplingFetcher:
@@ -36,7 +36,7 @@ class TestScraplingFetcher:
 
     # ── Test 1: Tier 1 (httpx) success ──────────────────────────────
 
-    @patch("browsing_meta.extraction.scrapling_fetcher.httpx.AsyncClient")
+    @patch("browser_goat.extraction.scrapling_fetcher.httpx.AsyncClient")
     async def test_fetch_tier1_success(
         self, mock_client_cls: MagicMock, fetcher: ScraplingFetcher
     ) -> None:
@@ -62,7 +62,7 @@ class TestScraplingFetcher:
 
     # ── Test 2: FetchResult field correctness ───────────────────────
 
-    @patch("browsing_meta.extraction.scrapling_fetcher.httpx.AsyncClient")
+    @patch("browser_goat.extraction.scrapling_fetcher.httpx.AsyncClient")
     async def test_fetch_result_fields(
         self, mock_client_cls: MagicMock, fetcher: ScraplingFetcher
     ) -> None:
@@ -87,7 +87,7 @@ class TestScraplingFetcher:
 
     # ── Test 3: Connection error handling ───────────────────────────
 
-    @patch("browsing_meta.extraction.scrapling_fetcher.httpx.AsyncClient")
+    @patch("browser_goat.extraction.scrapling_fetcher.httpx.AsyncClient")
     async def test_fetch_connection_error(
         self, mock_client_cls: MagicMock, fetcher: ScraplingFetcher
     ) -> None:
@@ -97,7 +97,7 @@ class TestScraplingFetcher:
         mock_client.get = AsyncMock(side_effect=ConnectionError("Connection refused"))
 
         with (
-            patch("browsing_meta.extraction.scrapling_fetcher.asyncio.sleep", AsyncMock()),
+            patch("browser_goat.extraction.scrapling_fetcher.asyncio.sleep", AsyncMock()),
             patch.object(fetcher, "_try_scrapling") as mock_scrapling,
             patch.object(fetcher, "_try_playwright") as mock_pw,
         ):
@@ -178,7 +178,7 @@ class TestScraplingFetcher:
 
     # ── Test 6: Retry on HTTP 403 then succeed ──────────────────────
 
-    @patch("browsing_meta.extraction.scrapling_fetcher.httpx.AsyncClient")
+    @patch("browser_goat.extraction.scrapling_fetcher.httpx.AsyncClient")
     async def test_try_httpx_retry_on_403(
         self, mock_client_cls: MagicMock, fetcher: ScraplingFetcher
     ) -> None:
@@ -190,7 +190,7 @@ class TestScraplingFetcher:
         resp_200 = MagicMock(status_code=200, text="<html>Retry success</html>")
         mock_client.get = AsyncMock(side_effect=[resp_403, resp_200])
 
-        with patch("browsing_meta.extraction.scrapling_fetcher.asyncio.sleep", AsyncMock()):
+        with patch("browser_goat.extraction.scrapling_fetcher.asyncio.sleep", AsyncMock()):
             result = await fetcher._try_httpx("https://example.com", None)
 
         assert result.success is True

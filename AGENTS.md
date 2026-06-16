@@ -1,4 +1,4 @@
-# Browsing-Meta — AGENTS.md
+# browser-goat — AGENTS.md
 
 > Meta-layer search intelligence wrapping SearXNG with layered processing inspired by SearchWala, local-deep-research, Marco-DeepResearch, Tongyi-DeepResearch, and Scrapling.
 
@@ -160,7 +160,7 @@ uv sync            # Sync environment
 ## Testing Standards
 
 - Every public function must have at least one test
-- Tests mirror source: `src/browsing_meta/pre_search/query_intel.py` → `tests/pre_search/test_query_intel.py`
+- Tests mirror source: `src/browser_goat/pre_search/query_intel.py` → `tests/pre_search/test_query_intel.py`
 - Run: `uv run pytest`
 - Coverage target: ≥80%
 
@@ -222,11 +222,11 @@ Before creating a new file, ask: can this content be added to an existing file i
 
 | Channel | Decision | Reason |
 |---------|:---:|--------|
-| **PyPI** | ✅ Required | Python project, library usage model — `pip install browsing-meta` |
-| **uvx** | ✅ Required | Python CLI with zero-install UX — `uvx browsing-meta` via `[project.scripts]` |
-| **Docker** | ✅ Required | External service dependency (SearXNG), sidecar deployment model — bundles SearXNG + browsing-meta |
+| **PyPI** | ✅ Required | Python project, library usage model — `pip install browser-goat` |
+| **uvx** | ✅ Required | Python CLI with zero-install UX — `uvx browser-goat` via `[project.scripts]` |
+| **Docker** | ✅ Required | External service dependency (SearXNG), sidecar deployment model — bundles SearXNG + browser-goat |
 | **MCP Server** | ✅ Required | Primary consumer is AI agents — MCP is the agent-to-tool protocol |
-| **npm/npx** | ✅ Required | MCP-native distribution channel — thin Node.js wrapper that exposes the Python backend as an MCP server, enabling `npx browsing-meta` for zero-install agent usage |
+| **npm/npx** | ✅ Required | MCP-native distribution channel — thin Node.js wrapper that exposes the Python backend as an MCP server, enabling `npx browser-goat` for zero-install agent usage |
 | **Homebrew** | ✅ Recommended | macOS developer audience, low-effort formula |
 | **conda-forge** | ❌ Skipped | Pure Python — PyPI covers conda users |
 | **Cargo** | ❌ Skipped | Not a Rust project (see Module Language Profile below) |
@@ -243,14 +243,14 @@ Before creating a new file, ask: can this content be added to an existing file i
                                │ MCP protocol (stdio)
                     ┌──────────▼───────────────────┐
                     │   npm package (thin wrapper)  │ ← npm/npx channel
-                    │   npx browsing-meta           │
+                    │   npx browser-goat           │
                     │   → spawns Python backend     │
                     └──────────┬───────────────────┘
                                │ subprocess
                     ┌──────────▼───────────────────┐
                     │   Python library + CLI        │ ← PyPI + uvx channels
-                    │   pip install browsing-meta   │
-                    │   uvx browsing-meta           │
+                    │   pip install browser-goat   │
+                    │   uvx browser-goat           │
                     └──────────┬───────────────────┘
                                │ HTTP
                     ┌──────────▼───────────────────┐
@@ -259,9 +259,9 @@ Before creating a new file, ask: can this content be added to an existing file i
                     └──────────────────────────────┘
 ```
 
-- **PyPI + uvx**: Python library and CLI entry point. `[project.scripts]` exposes the `browsing-meta` command. uvx provides zero-install for Python developers.
-- **npm/npx**: Thin Node.js MCP server that spawns the Python CLI as a subprocess. This is the agent interface — `npx browsing-meta` in an MCP client config. The npm package contains only the MCP glue (~50 lines of TypeScript); all logic lives in the Python package.
-- **Docker**: `docker-compose.yml` bundles SearXNG + browsing-meta as a sidecar. Single `docker compose up` for self-hosted deployment.
+- **PyPI + uvx**: Python library and CLI entry point. `[project.scripts]` exposes the `browser-goat` command. uvx provides zero-install for Python developers.
+- **npm/npx**: Thin Node.js MCP server that spawns the Python CLI as a subprocess. This is the agent interface — `npx browser-goat` in an MCP client config. The npm package contains only the MCP glue (~50 lines of TypeScript); all logic lives in the Python package.
+- **Docker**: `docker-compose.yml` bundles SearXNG + browser-goat as a sidecar. Single `docker compose up` for self-hosted deployment.
 - **MCP Server**: The protocol surface — defined as a JSON schema of tools (`search`, `extract`, `verify`). Implemented by both the npm wrapper (for npx agents) and a Python-native MCP server (for uvx/pip agents).
 - **Homebrew**: Formula that installs the Python CLI via pipx or uv, for macOS developers who prefer `brew install`.
 

@@ -1,17 +1,17 @@
-# browsing-meta — MCP Server
+# browser-goat — MCP Server
 
-MCP (Model Context Protocol) server for [browsing-meta](https://github.com/Im-Busy/browsing-meta), a meta-layer search intelligence wrapper for SearXNG.
+MCP (Model Context Protocol) server for [browser-goat](https://github.com/Im-Busy/browser-goat), a meta-layer search intelligence wrapper for SearXNG.
 
-This npm package is a **thin bridge** — it spawns the Python `browsing-meta-mcp` backend and proxies MCP stdio communication. All search logic lives in the Python package.
+This npm package is a **thin bridge** — it spawns the Python `browser-goat-mcp` backend and proxies MCP stdio communication. All search logic lives in the Python package.
 
 ## Prerequisites
 
 - **Python 3.13+** — required
-- **browsing-meta** installed via pip/uv:
+- **browser-goat** installed via pip/uv:
   ```bash
-  pip install browsing-meta
+  pip install browser-goat
   # or
-  uv add browsing-meta
+  uv add browser-goat
   ```
 - **SearXNG** running somewhere (default: `http://localhost:8080`)
 
@@ -20,7 +20,7 @@ This npm package is a **thin bridge** — it spawns the Python `browsing-meta-mc
 ### Direct (npx)
 
 ```bash
-npx browsing-meta
+npx browser-goat
 ```
 
 ### MCP Client Config
@@ -30,9 +30,9 @@ Add to your MCP client configuration:
 ```json
 {
   "mcpServers": {
-    "browsing-meta": {
+    "browser-goat": {
       "command": "npx",
-      "args": ["browsing-meta"],
+      "args": ["browser-goat"],
       "env": {
         "SEARXNG_URL": "http://localhost:8080"
       }

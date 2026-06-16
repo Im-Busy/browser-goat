@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from browsing_meta.models import RawSearchResult
-from browsing_meta.post_search.url_pipeline import URLPipeline
+from browser_goat.models import RawSearchResult
+from browser_goat.post_search.url_pipeline import URLPipeline
 
 
 class TestNormalizeURL:

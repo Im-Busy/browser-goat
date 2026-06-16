@@ -6,8 +6,8 @@ adaptation, and performance tracking.
 
 from __future__ import annotations
 
-from browsing_meta.models import ExploreResult, RawSearchResult, StrategyStats
-from browsing_meta.strategy.adaptive_explorer import (
+from browser_goat.models import ExploreResult, RawSearchResult, StrategyStats
+from browser_goat.strategy.adaptive_explorer import (
     ADAPTATION_THRESHOLD,
     ALL_STRATEGIES,
     CATEGORY,

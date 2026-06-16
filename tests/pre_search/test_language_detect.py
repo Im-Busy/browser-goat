@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from browsing_meta.pre_search.language_detect import (
+from browser_goat.pre_search.language_detect import (
     _contains_cjk,
     detect_language_params,
     get_search_engines_for_language,
@@ -62,19 +62,19 @@ class TestDetectLanguageParams:
 
 class TestGetSearchEngines:
     def test_chinese_engines(self) -> None:
-        from browsing_meta.models import LanguageParams
+        from browser_goat.models import LanguageParams
         params = LanguageParams(location="China", gl="cn", hl="zh-cn")
         engines = get_search_engines_for_language(params)
         assert "baidu" in engines
 
     def test_english_engines(self) -> None:
-        from browsing_meta.models import LanguageParams
+        from browser_goat.models import LanguageParams
         params = LanguageParams()
         engines = get_search_engines_for_language(params)
         assert engines == ["google", "bing"]
 
     def test_korean_engines(self) -> None:
-        from browsing_meta.models import LanguageParams
+        from browser_goat.models import LanguageParams
         params = LanguageParams(location="South Korea", gl="kr", hl="ko")
         engines = get_search_engines_for_language(params)
         assert "naver" in engines

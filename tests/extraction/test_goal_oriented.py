@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import asyncio
 
-from browsing_meta.extraction.goal_oriented import GoalOrientedExtractor
-from browsing_meta.models import ExtractedContent
+from browser_goat.extraction.goal_oriented import GoalOrientedExtractor
+from browser_goat.models import ExtractedContent
 
 
 class TestGoalOrientedExtractor:

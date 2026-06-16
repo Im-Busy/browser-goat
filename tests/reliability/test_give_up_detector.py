@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from browsing_meta.reliability.give_up_detector import GiveUpDetector
+from browser_goat.reliability.give_up_detector import GiveUpDetector
 
 
 class TestDetect:

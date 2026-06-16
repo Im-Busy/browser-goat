@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from browsing_meta.pre_search.browser_profiles import PROFILES, BrowserProfiles
+from browser_goat.pre_search.browser_profiles import PROFILES, BrowserProfiles
 
 
 class TestBrowserProfiles:

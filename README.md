@@ -1,12 +1,12 @@
-# browsing-meta
+# browser-goat
 
-[![Tests](https://img.shields.io/badge/tests-304%20passed-brightgreen)](https://github.com/Im-Busy/browsing-meta)
+[![Tests](https://img.shields.io/badge/tests-304%20passed-brightgreen)](https://github.com/Im-Busy/browser-goat)
 [![Python](https://img.shields.io/badge/python-3.13%2B-blue)](https://python.org)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 > Meta-layer search intelligence wrapping SearXNG — Tavily-quality results on your own infrastructure.
 
-Browsing-meta adds six processing layers to [SearXNG](https://docs.searxng.org/): intent detection, hybrid ranking, anti-bot content extraction, reliability gating, adaptive strategy, and multi-rollout verification. The result is agent-ready search output competitive with commercial APIs — running entirely on your own infrastructure.
+browser-goat adds six processing layers to [SearXNG](https://docs.searxng.org/): intent detection, hybrid ranking, anti-bot content extraction, reliability gating, adaptive strategy, and multi-rollout verification. The result is agent-ready search output competitive with commercial APIs — running entirely on your own infrastructure.
 
 ```mermaid
 flowchart TD
@@ -55,9 +55,9 @@ flowchart TD
 ```json
 {
   "mcpServers": {
-    "browsing-meta": {
+    "browser-goat": {
       "command": "npx",
-      "args": ["browsing-meta"],
+      "args": ["browser-goat"],
       "env": { "SEARXNG_URL": "http://localhost:8080" }
     }
   }
@@ -69,21 +69,21 @@ Requires Python 3.13+ and a running SearXNG instance.
 ### CLI
 
 ```bash
-uvx browsing-meta search "latest AI research"
-uvx browsing-meta search "Python vs Rust" --strategy explore
-uvx browsing-meta extract "https://example.com/article"
+uvx browser-goat search "latest AI research"
+uvx browser-goat search "Python vs Rust" --strategy explore
+uvx browser-goat extract "https://example.com/article"
 ```
 
 ### Library
 
 ```bash
-pip install browsing-meta
+pip install browser-goat
 ```
 
 ```python
-from browsing_meta import BrowsingMeta
+from browser_goat import BrowserGoat
 
-meta = BrowsingMeta(searxng_url="http://localhost:8080")
+meta = BrowserGoat(searxng_url="http://localhost:8080")
 result = await meta.search("quantum computing")
 print(result.answer)
 ```
@@ -106,9 +106,9 @@ print(result.answer)
 ```json
 {
   "mcpServers": {
-    "browsing-meta": {
+    "browser-goat": {
       "command": "uvx",
-      "args": ["browsing-meta-mcp", "--searxng-url", "http://localhost:8080"]
+      "args": ["browser-goat-mcp", "--searxng-url", "http://localhost:8080"]
     }
   }
 }
@@ -119,9 +119,9 @@ print(result.answer)
 ```json
 {
   "mcpServers": {
-    "browsing-meta": {
+    "browser-goat": {
       "command": "npx",
-      "args": ["browsing-meta"],
+      "args": ["browser-goat"],
       "env": { "SEARXNG_URL": "http://localhost:8080" }
     }
   }
@@ -138,10 +138,10 @@ Bundled SearXNG + Redis sidecar deployment:
 docker compose up
 ```
 
-SearXNG starts at `localhost:8080`, browsing-meta API at `localhost:8000`.
+SearXNG starts at `localhost:8080`, browser-goat API at `localhost:8000`.
 
 ```bash
-docker exec browsing-meta uv run browsing-meta search "your query"
+docker exec browser-goat uv run browser-goat search "your query"
 ```
 
 ---
@@ -155,8 +155,8 @@ Each search passes through six layers before returning an answer. The diagram ab
 ## Development
 
 ```bash
-git clone https://github.com/Im-Busy/browsing-meta.git
-cd browsing-meta
+git clone https://github.com/Im-Busy/browser-goat.git
+cd browser-goat
 uv sync
 
 uv run pytest                  # 304 tests (287 unit + 17 integration)
