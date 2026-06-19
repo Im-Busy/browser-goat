@@ -1,12 +1,10 @@
-# browser-goat
+# browser-goat — Production-grade web search for AI agents.
 
 [![Tests](https://img.shields.io/badge/tests-304%20passed-brightgreen)](https://github.com/Im-Busy/browser-goat)
 [![Python](https://img.shields.io/badge/python-3.13%2B-blue)](https://python.org)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-> Meta-layer search intelligence wrapping SearXNG — Tavily-quality results on your own infrastructure.
-
-browser-goat adds six processing layers to [SearXNG](https://docs.searxng.org/): intent detection, hybrid ranking, anti-bot content extraction, reliability gating, adaptive strategy, and multi-rollout verification. The result is agent-ready search output competitive with commercial APIs — running entirely on your own infrastructure.
+> Six-stage search pipeline around SearXNG: query intent detection, hybrid BM25+MMR ranking, anti-bot content extraction, quality-gated retry, adaptive exploration, and multi-rollout consensus verification — running entirely on your own infrastructure.
 
 ```mermaid
 flowchart TD
