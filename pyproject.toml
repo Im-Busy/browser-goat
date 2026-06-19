@@ -1,7 +1,7 @@
 [project]
 name = "browser-goat"
 version = "0.1.0"
-description = "Meta-layer search intelligence wrapping SearXNG with pre/post processing, extraction, strategy, and verification from SearchWala, local-deep-research, Marco-DeepResearch, Tongyi-DeepResearch, and Scrapling."
+description = "Agent-native search pipeline — intent-aware querying, hybrid ranking, anti-bot extraction, and consensus verification wrapped around SearXNG."
 requires-python = ">=3.13"
 license = "MIT"
 license-files = ["LICENSE"]

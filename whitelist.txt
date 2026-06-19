@@ -10,7 +10,7 @@ tests/
 # === Documentation ===
 docs/
 README.md
-AGENTS.md
+ATTRIBUTION.md
 
 # === Project Config ===
 pyproject.toml
