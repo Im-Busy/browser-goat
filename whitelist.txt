@@ -1,0 +1,32 @@
+# Whitelist for public repo sync
+# Lines starting with # are ignored. Directories must end with /.
+
+# === Source Code ===
+src/
+
+# === Tests ===
+tests/
+
+# === Documentation ===
+docs/
+README.md
+AGENTS.md
+
+# === Project Config ===
+pyproject.toml
+uv.lock
+.gitignore
+
+# === Docker ===
+docker-compose.yml
+docker/
+Dockerfile
+
+# === npm/npx Channel ===
+npm/
+
+# === License ===
+LICENSE
+
+# === Sync Infrastructure ===
+whitelist.txt

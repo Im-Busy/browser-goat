@@ -5,6 +5,16 @@ description = "Meta-layer search intelligence wrapping SearXNG with pre/post pro
 requires-python = ">=3.13"
 license = "MIT"
 license-files = ["LICENSE"]
+readme = "README.md"
+authors = [{ name = "Joey Chiu" }]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Internet :: WWW/HTTP :: Indexing/Search",
+    "Operating System :: OS Independent",
+]
 dependencies = [
     "httpx[http2]>=0.28",
     "beautifulsoup4>=4.12",
@@ -63,3 +73,8 @@ dev = [
     "pytest-cov>=7.1.0",
     "ruff>=0.15.17",
 ]
+
+[project.urls]
+Homepage = "https://github.com/Im-Busy/browser-goat"
+Repository = "https://github.com/Im-Busy/browser-goat"
+Issues = "https://github.com/Im-Busy/browser-goat/issues"
