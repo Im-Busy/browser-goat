@@ -2,6 +2,25 @@
 
 > Meta-layer search intelligence wrapping SearXNG with layered processing inspired by SearchWala, local-deep-research, Marco-DeepResearch, Tongyi-DeepResearch, and Scrapling.
 
+## Repository Architecture
+
+This project uses a dual-remote Git architecture:
+
+| Component | Details |
+|-----------|---------|
+| **Private Remote** | `private` — `https://github.com/Im-Busy/browser-goat.git` |
+| **Private Branch** | `master` — full repository with all files (source + internal docs + plans) |
+| **Public Remote** | `public` — `https://github.com/Im-Busy/browser-goat.git` |
+| **Public Branch** | `public` — curated subset (source code, tests, docs, configs only) |
+
+**What stays private:** `MEMORY.md`, `plans/`, `docs/blueprint.md`, `.omo/`, `kilo.json`, `opencode.jsonc`, `.python-version`
+
+**What goes public:** Everything in `whitelist.txt` — `src/`, `tests/`, `docs/` (public docs only), `README.md`, `AGENTS.md`, `pyproject.toml`, `uv.lock`, `.gitignore`, `docker-compose.yml`, `docker/`, `Dockerfile`, `npm/`, `LICENSE`
+
+**Sync command:** `/sync` — merges private `master` → public `public`, strips private files, pushes. `/sync check` — verifies no private files on public branch. `/sync status` — shows sync state.
+
+**For contributors:** Clone the private remote for development. The public branch is a read-only mirror.
+
 ---
 
 ## Purpose
