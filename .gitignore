@@ -27,7 +27,7 @@ kilo.json
 opencode.jsonc
 MEMORY.md
 plans/
-docs/blueprint.md
+developer_docs/
 .python-version
 
 # Code intelligence cache (regenerable)
