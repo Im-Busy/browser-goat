@@ -1,0 +1,21 @@
+{
+  "name": "browser-goat",
+  "version": "0.1.0",
+  "description": "Meta-layer search intelligence wrapping SearXNG with pre/post processing, extraction, strategy, and verification",
+  "agent": "Sisyphus",
+  "skills": [
+    "C:\\Dev\\skills\\scrapling"
+  ],
+  "mcp": {
+    "searxng": {
+      "url": "http://localhost:8080",
+      "format": "json"
+    }
+  },
+  "commands": {},
+  "agents": {},
+  "python": {
+    "manager": "uv",
+    "version": "3.13"
+  }
+}

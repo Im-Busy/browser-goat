@@ -29,3 +29,6 @@ MEMORY.md
 plans/
 docs/blueprint.md
 .python-version
+
+# Code intelligence cache (regenerable)
+.codegraph/
