@@ -97,9 +97,20 @@ print(f"Sources: {len(result.sources)} pages — extraction_rate={result.extract
 | Building an application | **Library** | Full control over pipeline parameters, async integration, result parsing. |
 | Running a service | **Docker** | `docker compose up` — SearXNG + browser-goat as a sidecar. |
 
+**Skip browser-goat if** you only need raw search snippets (use SearXNG directly) or you're already happy with a managed API like Tavily or Exa. browser-goat adds overhead for a reason — if you don't need ranked, extracted, verified answers, the pipeline is more than you want.
+
 ## Why browser-goat?
 
 SearXNG is powerful but raw — it returns search results, not answers. browser-goat wraps it with six processing layers that turn those results into verified, structured answers that AI agents can trust. Each layer ports specific innovations from SearchWala, local-deep-research, Marco-DeepResearch, Tongyi-DeepResearch, and Scrapling.
+
+## Features
+
+- **Self-hosted** — No API keys, no rate limits, no third-party dependency. Your SearXNG, your infrastructure.
+- **Six processing layers** — Intent detection → SearXNG → Hybrid ranking (RRF + BM25 + MMR) → Content extraction → Quality-gated retry → Answer
+- **Anti-bot bypass** — Cloudflare Turnstile solving via Scrapling. Pages that block scrapers work.
+- **CJK language support** — Chinese, Japanese, and Korean queries route through appropriate search engines.
+- **Multi-rollout verification** — Run 5–8 parallel searches, vote on consensus, verify ties with an LLM (optional).
+- **Three interfaces, one engine** — MCP server for AI agents, CLI for scripting, Python library for integration.
 
 ## Architecture
 
@@ -156,6 +167,26 @@ flowchart TD
 | **Reliability** | 43 give-up patterns, quality-gated retry, force synthesis | Marco + SearchWala |
 | **Strategy** | Query classification, adaptive exploration, recursive decomposition | local-deep-research |
 | **Verification** | Multi-rollout voting, consensus verification, LLM tie-breaking | Marco |
+
+## Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SEARXNG_URL` | `http://localhost:8082` | SearXNG instance URL |
+| `BROWSER_GOAT_LLM` | (none) | LLM for verification tie-breaking. Format: `openai:gpt-4o-mini` or `ollama:llama3`. Optional — voting works without it. |
+| `BROWSER_GOAT_OPENAI_API_KEY` | (none) | API key when using `BROWSER_GOAT_LLM=openai:*` |
+| `BROWSER_GOAT_OLLAMA_HOST` | `http://localhost:11434` | Ollama host when using `BROWSER_GOAT_LLM=ollama:*` |
+
+## Compared to Alternatives
+
+| Tool | browser-goat | Raw SearXNG | Tavily / Exa |
+|------|:---:|:---:|:---:|
+| Self-hosted | ✅ Your infrastructure | ✅ Your infrastructure | ❌ API service |
+| Structured answers | ✅ Full pipeline output | ❌ Returns search snippets | ✅ API returns structured data |
+| Multi-source verification | ✅ Consensus voting across rollouts | ❌ | ❌ |
+| Anti-bot bypass | ✅ Scrapling + Playwright | ❌ | ✅ Proprietary |
+| Rate limits | None | Your SearXNG config | Tiered plans |
+| API key required | No | No | Yes |
 
 ## MCP Tools
 
