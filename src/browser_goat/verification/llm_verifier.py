@@ -60,7 +60,7 @@ def _create_openai_call(
     Returns ``None`` if the ``openai`` package is not installed.
     """
     try:
-        from openai import AsyncOpenAI  # noqa: PLC0415
+        from openai import AsyncOpenAI  # noqa: PLC0415  # type: ignore[import-not-found]
     except ImportError:
         return None
 
@@ -91,7 +91,7 @@ def _create_ollama_call(
                 timeout=httpx.Timeout(120.0),
             )
             response.raise_for_status()
-            return response.json().get("response", "")
+            return str(response.json().get("response", ""))
 
     return call
 

@@ -10,11 +10,11 @@ import asyncio
 import logging
 from typing import Any, cast
 
-logger = logging.getLogger(__name__)
-
 from browser_goat.models import RolloutConfig, SearchResult
 from browser_goat.pre_search.browser_profiles import PROFILES
 from browser_goat.verification.answer_voter import AnswerVoter
+
+logger = logging.getLogger(__name__)
 
 # ── Variation parameters ──────────────────────────────────────────────────────
 
