@@ -1,13 +1,14 @@
 # MCP Integration
 
-MCP (Model Context Protocol) lets AI coding tools use browser-goat as a search tool. Connect once, then use `search` and `extract` from any MCP-compatible client.
+MCP (Model Context Protocol) lets AI coding tools use browser-goat as a search tool. Connect once, then use `search`, `extract`, and `verify` from any MCP-compatible client.
 
 ## Available Tools
 
 | Tool | Description |
 |------|-------------|
-| `search` | Full pipeline search with intent detection, ranking, extraction, and verification |
+| `search` | Full pipeline: pre-search → SearXNG → ranking → extraction → reliability. Set `reliability_mode` to `"high"` for multi-rollout consensus voting or `"maximum"` for LLM-verified answers |
 | `extract` | Fetch and extract content from a single URL with anti-bot bypass |
+| `verify` | Verify answer quality by running multiple search rollouts and breaking ties via LLM evaluation |
 
 ## Platform Configs
 

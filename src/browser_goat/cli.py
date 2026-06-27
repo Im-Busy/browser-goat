@@ -113,13 +113,15 @@ RELIABILITY MODES
   standard   Single search pass with quality gate. The answer must pass
              minimum thresholds (length, citations) or retry once.
 
-  high       Two search passes with cross-validation. Answers are
-             compared across passes; disagreements trigger a third pass.
-             Best for questions where accuracy matters.
+  high       5 parallel searches with consensus voting. Results are
+             voted on across 5 parallel search passes. Best for
+             questions where accuracy matters.
 
-  maximum    Five parallel rollouts with consensus voting. Results are
-             voted on; ties broken by LLM verification. Best for
-             high-stakes questions or downstream agent consumption.
+  maximum    8 parallel searches with consensus voting + LLM
+             tie-breaking. Results are voted on across 8 parallel
+             search passes; ties broken by LLM verification. Best
+             for high-stakes questions or downstream agent
+             consumption.
 
 
 MCP TOOLS
