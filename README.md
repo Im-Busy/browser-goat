@@ -7,6 +7,8 @@
 
 > Six-stage search pipeline around SearXNG: query intent detection, hybrid BM25+MMR ranking, anti-bot content extraction, quality-gated retry, adaptive exploration, and multi-rollout consensus verification — running entirely on your own infrastructure.
 
+[Quick Start](#quick-start) · [How to Use](#how-to-use) · [Architecture](#architecture) · [MCP Tools](#mcp-tools) · [Docker](#docker) · [Docs](#documentation) · [Development](#development)
+
 ## Quick Start
 
 Requires Python 3.13+ and a running SearXNG instance. Run `uvx browser-goat --guide` for full documentation.
@@ -71,17 +73,29 @@ uvx browser-goat search "clinical trial results for mRNA vaccines" --reliability
 uvx browser-goat extract "https://en.wikipedia.org/wiki/Python_(programming_language)"
 
 # Programmatic — same pipeline, accessible from Python
+```python
 from browser_goat import BrowserGoat
 
 goat = BrowserGoat(searxng_url="http://localhost:8082")
 result = await goat.search("Rust vs Go performance benchmarks 2025")
 print(f"Answer: {result.answer}")
-print(f"Sources: {len(result.sources)} pages")
+print(f"Sources: {len(result.sources)} pages — extraction_rate={result.extraction_success_rate}")
+# Response shape: { answer, sources, query_intent, engines_used, reliability, verification, timestamp }
+```
 
 # MCP tool call — an AI agent invokes the search tool (conceptual)
-# The agent sends a tool call: search(query="Rust vs Go", time_range="year")
-# browser-goat runs the full pipeline and returns structured answer + sources
+# The agent sends: search(query="Rust vs Go", time_range="year", reliability_mode="high")
+# browser-goat returns structured JSON with answer + sources + reliability + verification metadata
 ```
+
+### Which Interface Should I Use?
+
+| You are... | Use... | Because... |
+|-----------|--------|-----------|
+| An AI agent (Claude, Cursor, OpenCode) | **MCP** | Tools appear in the agent's tool list. Zero config beyond the JSON snippet. |
+| Prototyping or scripting | **CLI** | `uvx browser-goat search "query"` — instant results, no code. |
+| Building an application | **Library** | Full control over pipeline parameters, async integration, result parsing. |
+| Running a service | **Docker** | `docker compose up` — SearXNG + browser-goat as a sidecar. |
 
 ## Why browser-goat?
 
