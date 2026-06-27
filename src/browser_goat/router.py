@@ -70,7 +70,6 @@ class BrowserGoat:
         self.ranker = HybridRanker()
         self.content_extractor = ContentExtractor()
         self.goal_extractor = GoalOrientedExtractor(llm_call=llm_call)
-        self.llm_call = llm_call
         self.scrapling = ScraplingFetcher()
         self.give_up = GiveUpDetector()
         self.quality = QualityGate()
@@ -81,7 +80,7 @@ class BrowserGoat:
         # Phase 3 — Verification
         self.multi_rollout = MultiRollout()
         self.answer_voter = AnswerVoter()
-        self.llm_verifier = LLMVerifier()
+        self.llm_verifier = LLMVerifier(llm_call=llm_call)
 
     async def search(
         self,
@@ -379,7 +378,6 @@ class BrowserGoat:
                 query=query,
                 candidates=vote.candidates,
                 sources=all_sources[:10],
-                llm_call=self.llm_call,
             )
             return SearchResult(
                 answer=verification.selected_answer,

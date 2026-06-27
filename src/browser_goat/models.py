@@ -312,6 +312,7 @@ class RolloutConfig(BaseModel):
     browser_profile_name: str = "Chrome 147 Windows"
     engines: list[str] = Field(default_factory=lambda: ["google", "bing"])
     time_range: str | None = None
+    query: str = ""  # the actual query string for this rollout (may differ from others)
     language: str = "en"
 
 

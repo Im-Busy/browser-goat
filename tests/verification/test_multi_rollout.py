@@ -83,7 +83,7 @@ class TestExecute:
 
     @pytest.mark.asyncio
     async def test_rollout_passes_different_params_to_meta(self, mock_meta: MagicMock) -> None:
-        """Verify each rollout call receives different engine/time params."""
+        """Verify each rollout call receives different engine/time/query params."""
         captured: list[dict[str, object]] = []
 
         async def capture(**kwargs: object) -> SearchResult:
@@ -92,10 +92,13 @@ class TestExecute:
 
         mock_meta.search.side_effect = capture
         mr = MultiRollout()
-        await mr.execute("test", meta=mock_meta, num_rollouts=3)
+        await mr.execute("what is the meaning of life", meta=mock_meta, num_rollouts=3)
         assert len(captured) == 3
-        # All calls should have the same base query
-        assert all(c["query"] == "test" for c in captured)
+        # First rollout uses the original query
+        assert captured[0]["query"] == "what is the meaning of life"
+        # Queries vary across rollouts (at least one is different)
+        queries = [c["query"] for c in captured]
+        assert len(set(queries)) > 1
 
     @pytest.mark.asyncio
     async def test_num_rollouts_clamped_to_max(self, mock_meta: MagicMock) -> None:

@@ -253,6 +253,12 @@ def build_parser() -> argparse.ArgumentParser:
         default="json",
         help="Output format (default: json)",
     )
+    search.add_argument(
+        "--llm",
+        type=str,
+        default=None,
+        help="LLM provider for verification tie-breaking (e.g. openai:gpt-4o-mini)",
+    )
 
     # ── extract ──
     extract = sub.add_parser("extract", help="Extract content from a URL")
@@ -355,6 +361,8 @@ def format_output(data: Any, fmt: str) -> str:
 
 
 async def cmd_search(args: argparse.Namespace) -> None:
+    if args.llm:
+        os.environ["BROWSER_GOAT_LLM"] = args.llm
     meta = BrowserGoat(searxng_url=args.searxng_url)
     result = await meta.search(
         query=args.query,

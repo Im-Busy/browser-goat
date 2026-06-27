@@ -8,10 +8,92 @@ selecting the best one with a confidence rating.
 from __future__ import annotations
 
 import json
+import os
 from collections.abc import Awaitable, Callable
 from typing import ClassVar
 
 from browser_goat.models import ConfidenceLevel, ExtractedSource, VerificationResult
+
+# ── LLM Call Factory ──────────────────────────────────────────────────────────
+
+
+def create_llm_call() -> Callable[[str], Awaitable[str]] | None:
+    """Create an LLM callable from BROWSER_GOAT_LLM env var.
+
+    Format: ``"openai:gpt-4o-mini"`` or ``"ollama:llama3"``.
+    If ``BROWSER_GOAT_OPENAI_API_KEY`` is set, uses OpenAI.
+    If ``BROWSER_GOAT_OLLAMA_HOST`` is set, uses Ollama
+    (defaults to ``"http://localhost:11434"``).
+    Returns ``None`` when no LLM is configured.
+    """
+    provider = os.environ.get("BROWSER_GOAT_LLM", "")
+    if not provider:
+        return None
+
+    if provider.startswith("openai:"):
+        model = provider.split(":", 1)[1]
+        api_key = os.environ.get(
+            "BROWSER_GOAT_OPENAI_API_KEY",
+            os.environ.get("OPENAI_API_KEY", ""),
+        )
+        if not api_key:
+            return None
+        return _create_openai_call(model, api_key)
+
+    if provider.startswith("ollama:"):
+        model = provider.split(":", 1)[1]
+        host = os.environ.get(
+            "BROWSER_GOAT_OLLAMA_HOST",
+            "http://localhost:11434",
+        )
+        return _create_ollama_call(model, host)
+
+    return None
+
+
+def _create_openai_call(
+    model: str,
+    api_key: str,
+) -> Callable[[str], Awaitable[str]] | None:
+    """Build an async callable that sends a prompt to OpenAI's chat API.
+
+    Returns ``None`` if the ``openai`` package is not installed.
+    """
+    try:
+        from openai import AsyncOpenAI  # noqa: PLC0415
+    except ImportError:
+        return None
+
+    client = AsyncOpenAI(api_key=api_key)
+
+    async def call(prompt: str) -> str:
+        response = await client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return response.choices[0].message.content or ""
+
+    return call
+
+
+def _create_ollama_call(
+    model: str,
+    host: str,
+) -> Callable[[str], Awaitable[str]]:
+    """Build an async callable that sends a prompt to Ollama's generate API."""
+    import httpx  # noqa: PLC0415 — project-level dependency, imported locally for testability
+
+    async def call(prompt: str) -> str:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{host}/api/generate",
+                json={"model": model, "prompt": prompt, "stream": False},
+                timeout=httpx.Timeout(120.0),
+            )
+            response.raise_for_status()
+            return response.json().get("response", "")
+
+    return call
 
 # ── Prompt Template ────────────────────────────────────────────────────────────
 
@@ -71,6 +153,14 @@ class LLMVerifier:
     _MAX_SOURCES_IN_PROMPT: ClassVar[int] = 10
     """Cap sources shown to the LLM to avoid token blowout."""
 
+    def __init__(
+        self,
+        llm_call: Callable[[str], Awaitable[str]] | None = None,
+    ) -> None:
+        self.llm_call = (
+            llm_call if llm_call is not None else create_llm_call()
+        )
+
     async def verify(
         self,
         query: str,
@@ -90,8 +180,9 @@ class LLMVerifier:
             Extracted source objects used to form the answers.
         llm_call:
             Async callable that takes a prompt string and returns the LLM
-            response. When ``None``, falls back to returning the first
-            candidate with no confidence.
+            response. Overrides ``self.llm_call`` when provided.
+            When both this and ``self.llm_call`` are ``None``, falls back
+            to returning the first candidate with no confidence.
 
         Returns
         -------
@@ -103,10 +194,12 @@ class LLMVerifier:
         - Empty candidates → ``VerificationResult(method="fallback",
           confidence=NONE)`` with empty ``selected_answer``.
         - Single candidate → returned directly with ``MEDIUM`` confidence.
-        - ``llm_call=None`` → fallback, first candidate returned with
+        - No LLM configured → fallback, first candidate returned with
           ``NONE`` confidence and ``method="fallback"``.
         - LLM returns unparseable output → fallback with ``LOW`` confidence.
         """
+        effective_llm = llm_call if llm_call is not None else self.llm_call
+
         # ── Edge cases that bypass LLM ──────────────────────────────────────
         if not candidates:
             return VerificationResult(
@@ -124,7 +217,7 @@ class LLMVerifier:
                 method="fallback",
             )
 
-        if llm_call is None:
+        if effective_llm is None:
             return VerificationResult(
                 selected_answer=candidates[0],
                 confidence=ConfidenceLevel.NONE,
@@ -159,7 +252,7 @@ class LLMVerifier:
 
         # ── Call LLM ────────────────────────────────────────────────────────
         try:
-            response = await llm_call(prompt)
+            response = await effective_llm(prompt)
         except Exception as exc:
             return VerificationResult(
                 selected_answer=candidates[0],
