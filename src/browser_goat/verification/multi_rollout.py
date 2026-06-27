@@ -7,7 +7,10 @@ Early stops when 4+ identical answers emerge via the answer voter.
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import Any, cast
+
+logger = logging.getLogger(__name__)
 
 from browser_goat.models import RolloutConfig, SearchResult
 from browser_goat.pre_search.browser_profiles import PROFILES
@@ -210,8 +213,9 @@ class MultiRollout:
                         result = task.result()
                         results.append(result)
                     except Exception:
-                        # Individual rollout failure — skip, continue with
-                        # remaining rollouts
+                        # Individual rollout failure — log the cause so
+                        # users can diagnose WHY (e.g. SearXNG unreachable)
+                        logger.exception("Rollout %s failed", task.get_name())
                         continue
 
             # ── Early-stop check ──────────────────────────────────────────
