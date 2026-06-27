@@ -5,15 +5,87 @@
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![PyPI](https://img.shields.io/badge/pypi-browser--goat-22c55e?logo=pypi)](https://pypi.org/project/browser-goat)
 
-![divider](https://readme-svg-wave-divider-generator.vercel.app/wave?type=sine&width=1200&height=100&amplitude=20&frequency=2&layers=2&color_top=22c55e&color_bottom=14532d&opacity=1&flip=false&gradient=false&mirror=false&animate=false)
-
 > Six-stage search pipeline around SearXNG: query intent detection, hybrid BM25+MMR ranking, anti-bot content extraction, quality-gated retry, adaptive exploration, and multi-rollout consensus verification — running entirely on your own infrastructure.
+
+## Quick Start
+
+Requires Python 3.13+ and a running SearXNG instance. Run `uvx browser-goat --guide` for full documentation.
+
+### MCP (AI Agents)
+
+```json
+{
+  "mcpServers": {
+    "browser-goat": {
+      "command": "npx",
+      "args": ["browser-goat"],
+      "env": { "SEARXNG_URL": "http://localhost:8082" }
+    }
+  }
+}
+```
+
+See [CLIENTS.md](CLIENTS.md) for platform-specific configuration (Claude Desktop, Cursor, OpenCode, GitHub Copilot, Windsurf).
+
+### CLI
+
+```bash
+uvx browser-goat search "latest AI research"
+uvx browser-goat search "Python vs Rust" --strategy explore
+uvx browser-goat extract "https://example.com/article"
+```
+
+### Library
+
+```python
+from browser_goat import BrowserGoat
+
+meta = BrowserGoat(searxng_url="http://localhost:8082")
+result = await meta.search("quantum computing")
+print(result.answer)
+```
+
+## How to Use
+
+Each example is copy-paste ready. All require Docker Compose running (`docker compose up`).
+
+```bash
+# Basic search — fires all six pipeline stages automatically
+uvx browser-goat search "latest AI research developments 2025"
+
+# Factual query — intent detection identifies this as a Factual query
+# and routes it through direct-answer optimization (no exploration overhead)
+uvx browser-goat search "capital of France"
+
+# Time-filtered — restricts SearXNG results to the past week
+uvx browser-goat search "AI regulation news" --time-range week
+
+# Deep research — enables adaptive exploration with recursive decomposition
+uvx browser-goat search "quantum computing applications in drug discovery" --strategy explore
+
+# High reliability — triggers multi-rollout verification and consensus voting
+# (also try --reliability maximum for 8 rollouts with LLM tie-breaking)
+uvx browser-goat search "clinical trial results for mRNA vaccines" --reliability high
+
+# Extract a page — fetches and cleans any URL with anti-bot bypass
+uvx browser-goat extract "https://en.wikipedia.org/wiki/Python_(programming_language)"
+
+# Programmatic — same pipeline, accessible from Python
+from browser_goat import BrowserGoat
+
+goat = BrowserGoat(searxng_url="http://localhost:8082")
+result = await goat.search("Rust vs Go performance benchmarks 2025")
+print(f"Answer: {result.answer}")
+print(f"Sources: {len(result.sources)} pages")
+
+# MCP tool call — an AI agent invokes the search tool (conceptual)
+# The agent sends a tool call: search(query="Rust vs Go", time_range="year")
+# browser-goat runs the full pipeline and returns structured answer + sources
+```
 
 ## Why browser-goat?
 
 SearXNG is powerful but raw — it returns search results, not answers. browser-goat wraps it with six processing layers that turn those results into verified, structured answers that AI agents can trust. Each layer ports specific innovations from SearchWala, local-deep-research, Marco-DeepResearch, Tongyi-DeepResearch, and Scrapling.
-
-![divider](https://readme-svg-wave-divider-generator.vercel.app/wave?type=sine&width=1200&height=100&amplitude=20&frequency=2&layers=2&color_top=22c55e&color_bottom=14532d&opacity=1&flip=false&gradient=false&mirror=false&animate=false)
 
 ## Architecture
 
@@ -71,60 +143,27 @@ flowchart TD
 | **Strategy** | Query classification, adaptive exploration, recursive decomposition | local-deep-research |
 | **Verification** | Multi-rollout voting, consensus verification, LLM tie-breaking | Marco |
 
-![divider](https://readme-svg-wave-divider-generator.vercel.app/wave?type=sine&width=1200&height=100&amplitude=20&frequency=2&layers=2&color_top=22c55e&color_bottom=14532d&opacity=1&flip=false&gradient=false&mirror=false&animate=false)
-
-## Quick Start
-
-### MCP (AI Agents)
-
-```json
-{
-  "mcpServers": {
-    "browser-goat": {
-      "command": "npx",
-      "args": ["browser-goat"],
-      "env": { "SEARXNG_URL": "http://localhost:8080" }
-    }
-  }
-}
-```
-
-Requires Python 3.13+ and a running SearXNG instance.
-
-### CLI
-
-```bash
-uvx browser-goat search "latest AI research"
-uvx browser-goat search "Python vs Rust" --strategy explore
-uvx browser-goat extract "https://example.com/article"
-```
-
-Run `uvx browser-goat --guide` for full documentation.
-
-### Library
-
-```python
-from browser_goat import BrowserGoat
-
-meta = BrowserGoat(searxng_url="http://localhost:8080")
-result = await meta.search("quantum computing")
-print(result.answer)
-```
-
 ## MCP Tools
 
 | Tool | Description |
 |------|-------------|
-| `search` | Full pipeline: intent -> SearXNG -> ranking -> extraction -> reliability. Supports `time_range`, `max_sources`, `strategy`. |
+| `search` | Full pipeline: intent -> SearXNG -> ranking -> extraction -> reliability. Supports `time_range`, `max_sources`, `strategy`, `reliability_mode`. |
 | `extract` | Fetch and extract a single URL with anti-bot bypass (Cloudflare Turnstile). |
+| `verify` | Run multi-rollout verification on a claim by issuing parallel searches and voting on consensus. |
 
-See [CLIENTS.md](CLIENTS.md) for platform-specific MCP configuration.
+See [CLIENTS.md](CLIENTS.md) for platform-specific MCP configuration snippets.
 
 ## Docker
 
 ```bash
-docker compose up   # SearXNG at localhost:8080, API at localhost:8000
+docker compose up   # SearXNG at localhost:8082, API at localhost:8003
 ```
+
+## Documentation
+
+Run `uvx browser-goat --guide` for the built-in usage reference.
+
+For MCP integration across Claude Desktop, Cursor, OpenCode, GitHub Copilot, and Windsurf, see [CLIENTS.md](CLIENTS.md). Architecture details and design decisions live in [developer_docs/](developer_docs/).
 
 ## Development
 
