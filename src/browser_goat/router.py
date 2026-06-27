@@ -19,6 +19,7 @@ from browser_goat.models import (
     GoalOrientedResult,
     ReliabilityInfo,
     SearchResult,
+    VerificationResult,
 )
 from browser_goat.post_search.ranking import HybridRanker
 from browser_goat.post_search.url_pipeline import URLPipeline
@@ -79,7 +80,7 @@ class BrowserGoat:
         # Phase 3 — Verification
         self.multi_rollout = MultiRollout()
         self.answer_voter = AnswerVoter()
-        self.llm_verifier = LLMVerifier()
+        self.llm_verifier = LLMVerifier(llm_call=llm_call)
 
     async def search(
         self,
@@ -113,6 +114,16 @@ class BrowserGoat:
                 query, engines, time_range, language, max_sources,
                 strategy, reliability_mode,
             )
+        elif reliability_mode == "auto":
+            analysis = self.query_intel.analyze(query)
+            if (
+                analysis.intent in ("research", "comparison")
+                and analysis.complexity == "complex"
+            ):
+                return await self._verified_search(
+                    query, engines, time_range, language, max_sources,
+                    strategy, "high",
+                )
 
         # ── Phase 2: Strategy dispatch ─────────────────────────────────────
         if strategy == "auto":
@@ -325,7 +336,16 @@ class BrowserGoat:
         )
 
         if not results:
-            return SearchResult(answer="No results from verification rollouts.")
+            return SearchResult(
+                answer="No results from verification rollouts.",
+                verification=VerificationResult(
+                    selected_answer="No results from verification rollouts.",
+                    confidence=None,
+                    method="rollout_failure",
+                    is_consensus=False,
+                    rollout_count=0,
+                ),
+            )
 
         answers = [r.answer for r in results]
         vote = self.answer_voter.vote(answers)
@@ -343,6 +363,13 @@ class BrowserGoat:
                     if results else 0.0
                 ),
                 pipeline_latency_ms=results[0].pipeline_latency_ms if results else 0,
+                verification=VerificationResult(
+                    selected_answer=vote.winner_answer,
+                    confidence=vote.confidence,
+                    method="consensus",
+                    is_consensus=True,
+                    rollout_count=rollout_count,
+                ),
             )
 
         if reliability_mode == "maximum" and len(vote.candidates) > 1:
@@ -351,16 +378,29 @@ class BrowserGoat:
                 query=query,
                 candidates=vote.candidates,
                 sources=all_sources[:10],
-                llm_call=self.goal_extractor._llm_call,
             )
             return SearchResult(
                 answer=verification.selected_answer,
                 sources=results[0].sources if results else [],
+                verification=VerificationResult(
+                    selected_answer=verification.selected_answer,
+                    confidence=verification.confidence,
+                    method="llm",
+                    is_consensus=False,
+                    rollout_count=rollout_count,
+                ),
             )
 
         return SearchResult(
             answer=vote.candidates[0] if vote.candidates else "No consensus reached.",
             sources=results[0].sources if results else [],
+            verification=VerificationResult(
+                selected_answer=vote.candidates[0] if vote.candidates else "No consensus reached.",
+                confidence=None,
+                method="fallback",
+                is_consensus=False,
+                rollout_count=rollout_count,
+            ),
         )
 
     # ── Shared Extraction ─────────────────────────────────────────────────

@@ -66,7 +66,7 @@ Execute a full search through every active pipeline layer. Returns a `SearchResu
 | `"standard"` | 1 | Single pipeline pass with give-up detection and quality gate. |
 | `"high"` | 5 | Five independent searches with consensus voting. Returns the answer agreed upon by at least 4 of 5 rollouts. |
 | `"maximum"` | 8 | Eight rollouts with consensus voting plus LLM tie-breaking when no clear winner emerges. |
-| `"auto"` | *(routed)* | Behaves like `"standard"`. Reserved for future adaptive routing. |
+| `"auto"` | *(adaptive)* | Adaptively selects mode based on query complexity and intent classification. |
 
 #### Return type: SearchResult
 

@@ -206,6 +206,7 @@ class SearchResult(BaseModel):
     extraction_success_rate: float = 0.0
     pipeline_latency_ms: int = 0
     reliability: ReliabilityInfo = Field(default_factory=ReliabilityInfo)
+    verification: VerificationResult | None = None
     timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
 
 
@@ -298,9 +299,11 @@ class VerificationResult(BaseModel):
     """Output of LLM verification for tied answers."""
 
     selected_answer: str = ""
-    confidence: ConfidenceLevel = ConfidenceLevel.MEDIUM
+    confidence: ConfidenceLevel | None = None
     reasoning: str = ""
     method: str = "vote"  # vote or llm
+    is_consensus: bool = False
+    rollout_count: int = 0
 
 
 class RolloutConfig(BaseModel):
@@ -309,6 +312,7 @@ class RolloutConfig(BaseModel):
     browser_profile_name: str = "Chrome 147 Windows"
     engines: list[str] = Field(default_factory=lambda: ["google", "bing"])
     time_range: str | None = None
+    query: str = ""  # the actual query string for this rollout (may differ from others)
     language: str = "en"
 
 
@@ -318,3 +322,6 @@ class RolloutResult(BaseModel):
     config: RolloutConfig = Field(default_factory=RolloutConfig)
     search_result: SearchResult | None = None
     rollout_id: int = 0
+
+
+SearchResult.model_rebuild()

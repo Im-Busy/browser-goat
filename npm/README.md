@@ -52,8 +52,9 @@ Add to your MCP client configuration:
 
 | Tool | Description |
 |------|-------------|
-| `search` | Execute a full search pipeline: pre-search → SearXNG → ranking → extraction |
+| `search` | Full search pipeline: pre-search → SearXNG → ranking → extraction → reliability. Use `reliability_mode` for verification (`"high"` or `"maximum"`) |
 | `extract` | Fetch and extract content from a single URL |
+| `verify` | Verify answer quality via multi-rollout voting and LLM evaluation |
 
 ## License
 

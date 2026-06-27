@@ -7,11 +7,14 @@ Early stops when 4+ identical answers emerge via the answer voter.
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import Any, cast
 
 from browser_goat.models import RolloutConfig, SearchResult
 from browser_goat.pre_search.browser_profiles import PROFILES
 from browser_goat.verification.answer_voter import AnswerVoter
+
+logger = logging.getLogger(__name__)
 
 # ── Variation parameters ──────────────────────────────────────────────────────
 
@@ -151,6 +154,28 @@ class MultiRollout:
         # Generate parameter configurations
         configs = self._generate_configs(num_rollouts)
 
+        # Inject query variations so each rollout uses a semantically
+        # equivalent but syntactically different query string — this
+        # produces genuinely different result sets to vote on.
+        for i, config in enumerate(configs):
+            strategy_idx = i % 3
+            if strategy_idx == 0:
+                config.query = query
+            elif strategy_idx == 1:
+                # Keyword-focused variant: strip filler phrases
+                config.query = (
+                    query.lower()
+                    .replace("what is", "")
+                    .replace("how to", "")
+                    .replace("who is", "")
+                    .replace("where is", "")
+                    .replace("when did", "")
+                    .replace("why is", "")
+                    .strip()
+                ) or query
+            else:
+                config.query = query
+
         # Default voter
         if answer_voter is None:
             answer_voter = AnswerVoter()
@@ -161,7 +186,7 @@ class MultiRollout:
 
         async def _run_one(config: RolloutConfig) -> SearchResult:
             result = await meta.search(
-                query=query,
+                query=config.query,
                 engines=config.engines,
                 time_range=config.time_range,
                 language=config.language,
@@ -188,8 +213,9 @@ class MultiRollout:
                         result = task.result()
                         results.append(result)
                     except Exception:
-                        # Individual rollout failure — skip, continue with
-                        # remaining rollouts
+                        # Individual rollout failure — log the cause so
+                        # users can diagnose WHY (e.g. SearXNG unreachable)
+                        logger.exception("Rollout %s failed", task.get_name())
                         continue
 
             # ── Early-stop check ──────────────────────────────────────────

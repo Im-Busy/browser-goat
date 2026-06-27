@@ -20,7 +20,7 @@ Connecting (example MCP client config):
 from __future__ import annotations
 
 import argparse
-from typing import Any
+from typing import Annotated, Any
 
 from mcp.server.fastmcp import FastMCP
 
@@ -56,6 +56,12 @@ def create_mcp_server(searxng_url: str) -> FastMCP:
         query: str,
         time_range: str | None = None,
         max_sources: int = 15,
+        reliability_mode: Annotated[
+            str, "Reliability level: 'standard', 'high', or 'maximum'."
+        ] = "standard",
+        strategy: Annotated[
+            str, "Search strategy: 'auto', 'direct', or 'explore'."
+        ] = "auto",
     ) -> dict[str, Any]:
         """Execute a full search pipeline: pre-search → SearXNG → post-search → extraction → reliability.
 
@@ -63,6 +69,8 @@ def create_mcp_server(searxng_url: str) -> FastMCP:
             query: The search query string.
             time_range: Optional time filter — one of "day", "week", "month", "year".
             max_sources: Maximum number of sources to extract (default: 15, max: 50).
+            reliability_mode: Reliability level — "standard", "high", or "maximum".
+            strategy: Search strategy — "auto", "direct", or "explore".
         """
         meta = get_meta()
         max_sources = min(max(1, max_sources), 50)  # clamp to [1, 50]
@@ -70,7 +78,8 @@ def create_mcp_server(searxng_url: str) -> FastMCP:
             query=query,
             time_range=time_range,
             max_sources=max_sources,
-            strategy="auto",
+            reliability_mode=reliability_mode,
+            strategy=strategy,
         )
         return result.model_dump()
 
@@ -103,6 +112,29 @@ def create_mcp_server(searxng_url: str) -> FastMCP:
             "text_length": len(content.text),
             "success": True,
         }
+
+    @mcp.tool()
+    async def verify(
+        query: str,
+        rollouts: Annotated[int, "Number of parallel search rollouts (3-8)."] = 5,
+        searxng_url: str = "",
+    ) -> dict[str, Any]:
+        """Run multi-rollout verification with consensus voting across parallel searches.
+
+        Higher rollouts increase confidence through cross-verification. Each rollout
+        independently searches and extracts; the final answer is determined by
+        consensus voting with LLM tie-breaking when needed.
+
+        Args:
+            query: The search query string.
+            rollouts: Number of parallel search rollouts (3-8, default: 5).
+            searxng_url: Optional SearXNG URL override (uses default when empty).
+        """
+        meta = get_meta()
+        rollouts = max(3, min(8, rollouts))
+        reliability_mode = "high" if rollouts <= 5 else "maximum"
+        result = await meta.search(query=query, reliability_mode=reliability_mode)
+        return result.model_dump()
 
     return mcp
 
