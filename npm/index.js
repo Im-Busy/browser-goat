@@ -9,29 +9,20 @@
  *
  * Usage:
  *   npx browser-goat
- *   SEARXNG_URL=http://localhost:8080 npx browser-goat
+ *   SEARXNG_URL=http://localhost:8082 npx browser-goat
  */
 
 const { spawn } = require("child_process");
 
-const searxngUrl = process.env.SEARXNG_URL || "http://localhost:8080";
+const searxngUrl = process.env.SEARXNG_URL || "http://localhost:8082";
 
-const args = ["-m", "browser_goat.mcp_server", "--searxng-url", searxngUrl];
+const args = ["-m", "browser_goat.mcp_server", "--searxng-url", searxngUrl, ...process.argv.slice(2)];
 const pythonCmd = process.env.PYTHON_CMD || "python";
 
 const child = spawn(pythonCmd, args, {
-  stdio: ["pipe", "pipe", "pipe"],
+  stdio: "inherit",
   env: { ...process.env },
 });
-
-// Proxy stdin → child
-process.stdin.pipe(child.stdin);
-
-// Proxy child stdout → stdout
-child.stdout.pipe(process.stdout);
-
-// Proxy child stderr → stderr (for logging)
-child.stderr.pipe(process.stderr);
 
 child.on("error", (err) => {
   console.error(`[browser-goat] Failed to start Python backend: ${err.message}`);
@@ -39,8 +30,8 @@ child.on("error", (err) => {
   process.exit(1);
 });
 
-child.on("exit", (code) => {
-  process.exit(code || 0);
+child.on("close", (code, signal) => {
+  process.exitCode = code ?? (signal === "SIGINT" ? 130 : 143);
 });
 
 // Forward signals

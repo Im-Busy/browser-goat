@@ -1,6 +1,6 @@
 {
   "name": "browser-goat",
-  "version": "0.1.0",
+  "version": "0.2.1",
   "description": "MCP server for browser-goat — meta-layer search intelligence wrapping SearXNG",
   "bin": {
     "browser-goat": "index.js"

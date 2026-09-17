@@ -17,7 +17,10 @@ from browser_goat.models import CleanedResult, RankedResult
 
 # ── Constants (from SearchWala ranking.rs) ────────────────────────────────────
 
-RRF_K = 60  # Cormack 2009 constant
+RRF_K = 60  # Cormack 2009 default for TREC-scale corpora
+RRF_K_SMALL = 15  # for small result sets (<=15): trust rank order sharply
+RRF_K_MEDIUM = 30  # for medium result sets (16-40)
+RRF_K_LARGE = RRF_K  # for large result sets (>40): standard TREC default
 BM25_K1 = 1.2  # term frequency saturation
 BM25_B = 0.75  # length normalization
 BM25_DELTA = 1.0  # Lv & Zhai 2011 lower bound (guarantees positive scores)
@@ -107,19 +110,42 @@ class HybridRanker:
 
     # ── Stage A: Reciprocal Rank Fusion ──────────────────────────────────────
 
+    @staticmethod
+    def _rrf_k_for_size(n_results: int) -> int:
+        """Pick RRF k constant based on result-set size.
+
+        Evidence: WANDS e-commerce benchmark shows small corpora (100-300 docs)
+        benefit from k=10-20 because rank differences are sharper; TREC-scale
+        corpora use k=60 to prevent any single result from dominating.
+
+        For browser-goat's typical rank range (10-20 results), k=15 sharpens
+        the top of the list and surfaces more diverse, top-ranked sources.
+        """
+        if n_results <= 15:
+            return RRF_K_SMALL
+        elif n_results <= 40:
+            return RRF_K_MEDIUM
+        else:
+            return RRF_K_LARGE
+
     def _compute_rrf(self, results: list[CleanedResult]) -> list[RankedResult]:
         """Compute RRF scores based on cross-engine consensus.
 
         Each result gets a score based on its position in each engine's results:
             score = Σ engine_weight / (RRF_K + position)
+        where RRF_K is selected adaptively based on result-set size.
         """
+        # URLPipeline retains rejected rows for diagnostics. They must never
+        # enter either scoring loop or consume the extraction source budget.
+        results = [r for r in results if not r.is_duplicate and not r.blocked_reason]
         # Group results by engine
         engine_results: dict[str, list[CleanedResult]] = {}
         for r in results:
-            if r.is_duplicate or r.blocked_reason:
-                continue
             engine = r.engine or "unknown"
             engine_results.setdefault(engine, []).append(r)
+
+        # Select k adaptively based on engine-grouped result count
+        k = self._rrf_k_for_size(len(engine_results))
 
         # Compute RRF for each result
         ranked: list[RankedResult] = []
@@ -133,7 +159,7 @@ class HybridRanker:
             except ValueError:
                 position = len(engine_list) + 1
 
-            rrf_score = weight / (RRF_K + position)
+            rrf_score = weight / (k + position)
 
             ranked.append(
                 RankedResult(

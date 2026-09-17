@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 import httpx
@@ -17,7 +18,7 @@ class SearXNGClient:
     """Async HTTP client for SearXNG's JSON search API.
 
     Usage:
-        client = SearXNGClient("http://localhost:8080")
+        client = SearXNGClient("http://localhost:8082")
         results = await client.search("what is python?")
 
     Integrates browser profile headers and language-aware parameters
@@ -26,7 +27,7 @@ class SearXNGClient:
 
     def __init__(
         self,
-        base_url: str = "http://localhost:8080",
+        base_url: str = "http://localhost:8082",
         timeout: float = 15.0,
     ) -> None:
         self.base_url = base_url.rstrip("/")
@@ -110,6 +111,11 @@ class SearXNGClient:
             )
             response.raise_for_status()
             data = response.json()
+        except httpx.ConnectError as exc:
+            raise httpx.ConnectError(
+                f"Cannot connect to SearXNG at {self.base_url}. Start SearXNG and check SEARXNG_URL.",
+                request=exc.request,
+            ) from exc
         except httpx.HTTPError:
             raise
         except Exception as exc:
@@ -155,6 +161,8 @@ class SearXNGClient:
             ]
         }
         """
+        if not isinstance(data, dict):
+            raise ValueError("SearXNG response must be a JSON object")
         raw_results = data.get("results", [])
         if not isinstance(raw_results, list):
             return []
@@ -165,7 +173,7 @@ class SearXNGClient:
                 continue
 
             url = item.get("url", "")
-            if not url:
+            if not isinstance(url, str) or not url:
                 continue
 
             # parsed_url is either a list of strings or None
@@ -175,14 +183,18 @@ class SearXNGClient:
             else:
                 parsed_url = url
 
+            try:
+                score = float(item.get("score") or 0)
+            except (ValueError, TypeError):
+                score = 0.0
             parsed.append(
                 RawSearchResult(
-                    title=item.get("title", ""),
+                    title=str(item.get("title") or ""),
                     url=url,
-                    content=item.get("content", ""),
-                    engine=item.get("engine", ""),
-                    score=float(item.get("score", 0.0)),
-                    category=item.get("category", ""),
+                    content=str(item.get("content") or ""),
+                    engine=str(item.get("engine") or ""),
+                    score=score if math.isfinite(score) else 0.0,
+                    category=str(item.get("category") or ""),
                     parsed_url=parsed_url,
                     published_date=item.get("publishedDate"),
                 )
@@ -191,10 +203,10 @@ class SearXNGClient:
         return parsed
 
     async def health_check(self) -> bool:
-        """Check if SearXNG instance is reachable."""
+        """Check if SearXNG instance is reachable via /config endpoint."""
         try:
             client = await self._get_client()
-            response = await client.get(f"{self.base_url}/health")
+            response = await client.get(f"{self.base_url}/config")
             return response.status_code == 200
         except Exception:
             return False

@@ -1,6 +1,6 @@
 [project]
 name = "browser-goat"
-version = "0.2.0"
+version = "0.2.1"
 description = "Agent-native search pipeline — intent-aware querying, hybrid ranking, anti-bot extraction, and consensus verification wrapped around SearXNG."
 requires-python = ">=3.13"
 license = "MIT"
@@ -23,7 +23,8 @@ dependencies = [
     "tenacity>=9.0",
     "tiktoken>=0.8",
     "playwright>=1.49",
-    "scrapling>=0.2",
+    "scrapling[fetchers]>=0.4.9,<0.5",
+    "crawl4ai>=0.9,<1.0",
     "mcp>=1.0",
 ]
 
@@ -65,6 +66,7 @@ testpaths = ["tests"]
 markers = [
     "integration: end-to-end tests requiring a running SearXNG instance",
     "stress: high-load stress/load tests (requires no real SearXNG)",
+    "browser_local: opt-in browser-backed extraction against localhost only",
 ]
 
 [tool.uv]

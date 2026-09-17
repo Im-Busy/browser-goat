@@ -15,7 +15,7 @@ import re
 from collections.abc import Awaitable, Callable
 from typing import Any
 
-from browser_goat.models import ExploreResult, StrategyStats
+from browser_goat.models import ExploreResult, RawSearchResult, StrategyStats
 
 # ── Strategy Names ─────────────────────────────────────────────────────────────
 
@@ -141,6 +141,7 @@ class AdaptiveExplorer:
         query: str,
         searxng_client: Any,
         llm_call: Callable[[list[dict[str, Any]]], Awaitable[str]] | None = None,
+        search_options: dict[str, Any] | None = None,
     ) -> ExploreResult:
         """Execute a multi-angle exploration round.
 
@@ -193,21 +194,29 @@ class AdaptiveExplorer:
             query_variants[DIRECT] = query
 
         # Execute all variants in parallel via SearXNG
-        tasks: dict[str, asyncio.Task[list[str]]] = {
+        tasks: dict[str, asyncio.Task[list[RawSearchResult]]] = {
             strategy: asyncio.create_task(
-                self._search(strategy, searxng_client, variant),
+                self._search(strategy, searxng_client, variant, search_options),
             )
             for strategy, variant in query_variants.items()
         }
 
-        all_candidates: list[str] = []
-        for strategy, task in tasks.items():
-            try:
-                candidates = await task
-                all_candidates.extend(candidates)
-            except Exception:
-                # Still count the attempt even on failure
-                self._stats[strategy].attempts += 1
+        all_results: list[RawSearchResult] = []
+        errors: list[Exception] = []
+        try:
+            for strategy, task in tasks.items():
+                try:
+                    all_results.extend(await task)
+                except Exception as exc:
+                    self._stats[strategy].attempts += 1
+                    errors.append(exc)
+        finally:
+            for task in tasks.values():
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(*tasks.values(), return_exceptions=True)
+        if len(errors) == len(tasks):
+            raise errors[0]
 
         stats_list = list(self._stats.values())
         total_attempts = sum(s.attempts for s in stats_list)
@@ -219,7 +228,8 @@ class AdaptiveExplorer:
 
         return ExploreResult(
             strategy_stats=stats_list,
-            candidates=all_candidates,
+            candidates=[r.url for r in all_results if r.url],
+            results=all_results,
             total_attempts=total_attempts,
             adapted_strategy=adapted,
         )
@@ -367,7 +377,8 @@ class AdaptiveExplorer:
         strategy: str,
         searxng_client: Any,
         query: str,
-    ) -> list[str]:
+        search_options: dict[str, Any] | None = None,
+    ) -> list[RawSearchResult]:
         """Execute a search and extract candidate URLs.
 
         Calls ``searxng_client.search(query=query)``, collects the result
@@ -383,7 +394,7 @@ class AdaptiveExplorer:
         Returns:
             List of result URLs (candidates) found.
         """
-        results = await searxng_client.search(query=query)
+        results: list[RawSearchResult] = await searxng_client.search(query=query, **(search_options or {}))
 
         # Collect valid URLs
         urls = [r.url for r in results if r.url]
@@ -398,7 +409,7 @@ class AdaptiveExplorer:
             total_content_len = sum(len(r.content) for r in results if r.url)
             stat.quality_sum += total_content_len / max(len(urls), 1)
 
-        return urls
+        return results
 
     # ── Strategy Adaptation ─────────────────────────────────────────────────────
 

@@ -128,6 +128,7 @@ class RecursiveDecomposer:
         searxng_client: SearXNGClient,
         llm_call: Callable[[list[dict[str, Any]]], Awaitable[str]],
         depth: int = 0,
+        search_options: dict[str, Any] | None = None,
     ) -> DecomposedResult:
         """Recursively decompose and solve a query.
 
@@ -156,7 +157,7 @@ class RecursiveDecomposer:
             can_direct = True
 
         if can_direct:
-            return await self._solve_direct(query, searxng_client, llm_call, depth)
+            return await self._solve_direct(query, searxng_client, llm_call, depth, search_options)
 
         # ── Step 2: Generate subtasks ──────────────────────────────────────
         subtask_defs = await self._generate_subtasks(query, llm_call)
@@ -171,10 +172,11 @@ class RecursiveDecomposer:
 
         if not subtasks:
             # LLM produced no subtasks — fall back to direct solve
-            return await self._solve_direct(query, searxng_client, llm_call, depth)
+            return await self._solve_direct(query, searxng_client, llm_call, depth, search_options)
 
         # ── Step 3: Dependency-aware execution ────────────────────────────
         completed: dict[str, SubTask] = {}
+        collected = []
         pending: set[str] = {st.id for st in subtasks}
 
         while pending:
@@ -196,12 +198,13 @@ class RecursiveDecomposer:
             # Execute ready tasks in parallel via recursive decomposition
             branch_results = await asyncio.gather(*[
                 self.decompose_and_solve(
-                    st.query, searxng_client, llm_call, depth + 1
+                    st.query, searxng_client, llm_call, depth + 1, search_options
                 )
                 for st in ready
             ])
 
             for st, branch in zip(ready, branch_results, strict=True):
+                collected.extend(branch.results)
                 st.status = "completed"
                 st.result = branch.aggregated_answer
                 completed[st.id] = st
@@ -219,6 +222,7 @@ class RecursiveDecomposer:
             depth=depth,
             aggregated_answer=aggregated,
             intermediate_results=list(completed.values()),
+            results=collected,
         )
 
     async def _check_can_answer_directly(
@@ -279,13 +283,14 @@ class RecursiveDecomposer:
         searxng_client: SearXNGClient,
         llm_call: Callable[[list[dict[str, Any]]], Awaitable[str]],
         depth: int,
+        search_options: dict[str, Any] | None = None,
     ) -> DecomposedResult:
         """Solve a query directly with a single search + LLM answer.
 
         This is the leaf-node resolution path: search the web, then
         have the LLM synthesize an answer from the results.
         """
-        search_results = await searxng_client.search(query)
+        search_results = await searxng_client.search(query, **(search_options or {}))
         snippets = "\n".join(
             f"- [{r.title}]({r.url}): {r.content}"
             for r in search_results[:10]
@@ -296,6 +301,7 @@ class RecursiveDecomposer:
             depth=depth,
             aggregated_answer=answer,
             intermediate_results=[],
+            results=search_results,
         )
 
     async def _answer_with_context(

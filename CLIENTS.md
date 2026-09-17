@@ -1,239 +1,39 @@
-# browser-goat -- MCP Client Configuration
+# MCP client setup
 
-Per-platform MCP configuration snippets for browser-goat. Copy the appropriate block into your tool's MCP config file.
+browser-goat exposes `search`, `extract`, and `verify` over MCP stdio. For tool
+inputs, results, and fallback behavior, use the [MCP reference](docs/mcp.md).
+For launcher snippets, use the [distribution examples](distribution/README.md).
 
-**Prerequisites**: Python 3.13+ and a SearXNG instance running on your machine.
+## Run a source checkout
 
-The `SEARXNG_URL` environment variable defaults to `http://localhost:8082` (the Docker Compose port). Set it if your SearXNG runs elsewhere.
+Install Python 3.13+ and uv, then prepare the checkout using the
+[installation guide](docs/install.md). Configure the client to launch:
 
-## Claude Desktop
-
-Config file: `claude_desktop_config.json`
-
-### npx method (zero-install)
-```json
-{
-  "mcpServers": {
-    "browser-goat": {
-      "command": "npx",
-      "args": ["browser-goat"],
-      "env": { "SEARXNG_URL": "http://localhost:8082" }
-    }
-  }
-}
-```
-
-### uvx method
-```json
-{
-  "mcpServers": {
-    "browser-goat": {
-      "command": "uvx",
-      "args": ["browser-goat-mcp"],
-      "env": { "SEARXNG_URL": "http://localhost:8082" }
-    }
-  }
-}
-```
-
-### Local Docker method
-```json
-{
-  "mcpServers": {
-    "browser-goat": {
-      "command": "uvx",
-      "args": ["browser-goat-mcp", "--searxng-url", "http://localhost:8082"],
-      "env": {}
-    }
-  }
-}
-```
-
-## Cursor / VS Code
-
-Config file: `.cursor/mcp.json`
-
-### npx method (zero-install)
-```json
-{
-  "mcpServers": {
-    "browser-goat": {
-      "command": "npx",
-      "args": ["browser-goat"],
-      "env": { "SEARXNG_URL": "http://localhost:8082" }
-    }
-  }
-}
-```
-
-### uvx method
-```json
-{
-  "mcpServers": {
-    "browser-goat": {
-      "command": "uvx",
-      "args": ["browser-goat-mcp"],
-      "env": { "SEARXNG_URL": "http://localhost:8082" }
-    }
-  }
-}
-```
-
-### Local Docker method
-```json
-{
-  "mcpServers": {
-    "browser-goat": {
-      "command": "uvx",
-      "args": ["browser-goat-mcp", "--searxng-url", "http://localhost:8082"],
-      "env": {}
-    }
-  }
-}
-```
-
-## OpenCode
-
-Config file: `opencode.jsonc` under `"mcpServers"`
-
-### npx method (zero-install)
-```json
-{
-  "browser-goat": {
-    "command": "npx",
-    "args": ["browser-goat"],
-    "env": { "SEARXNG_URL": "http://localhost:8082" }
-  }
-}
-```
-
-### uvx method (recommended)
-```json
-{
-  "browser-goat": {
-    "command": "uvx",
-    "args": ["browser-goat-mcp"],
-    "env": { "SEARXNG_URL": "http://localhost:8082" }
-  }
-}
-```
-
-### Local Docker method
-```json
-{
-  "browser-goat": {
-    "command": "uvx",
-    "args": ["browser-goat-mcp", "--searxng-url", "http://localhost:8082"],
-    "env": {}
-  }
-}
-```
-
-## GitHub Copilot
-
-Config: `.github/copilot-instructions.md` or VS Code `settings.json`
-
-### npx method (zero-install)
-```json
-{
-  "mcpServers": {
-    "browser-goat": {
-      "command": "npx",
-      "args": ["browser-goat"],
-      "env": { "SEARXNG_URL": "http://localhost:8082" }
-    }
-  }
-}
-```
-
-### uvx method
-```json
-{
-  "mcpServers": {
-    "browser-goat": {
-      "command": "uvx",
-      "args": ["browser-goat-mcp"],
-      "env": { "SEARXNG_URL": "http://localhost:8082" }
-    }
-  }
-}
-```
-
-### Local Docker method
-```json
-{
-  "mcpServers": {
-    "browser-goat": {
-      "command": "uvx",
-      "args": ["browser-goat-mcp", "--searxng-url", "http://localhost:8082"],
-      "env": {}
-    }
-  }
-}
-```
-
-## Windsurf
-
-Config file: `.windsurf/mcp.json`
-
-### npx method (zero-install)
-```json
-{
-  "mcpServers": {
-    "browser-goat": {
-      "command": "npx",
-      "args": ["browser-goat"],
-      "env": { "SEARXNG_URL": "http://localhost:8082" }
-    }
-  }
-}
-```
-
-### uvx method
-```json
-{
-  "mcpServers": {
-    "browser-goat": {
-      "command": "uvx",
-      "args": ["browser-goat-mcp"],
-      "env": { "SEARXNG_URL": "http://localhost:8082" }
-    }
-  }
-}
-```
-
-### Local Docker method
-```json
-{
-  "mcpServers": {
-    "browser-goat": {
-      "command": "uvx",
-      "args": ["browser-goat-mcp", "--searxng-url", "http://localhost:8082"],
-      "env": {}
-    }
-  }
-}
-```
-
-## SearXNG Setup
-
-### Docker Compose (recommended)
 ```bash
-docker compose up   # SearXNG at localhost:8082, API at localhost:8000
+uv run --project /path/to/browser-goat browser-goat-mcp --searxng-url http://localhost:8082
 ```
 
-### Standalone SearXNG
-```bash
-docker run -d -p 8082:8080 searxng/searxng
-```
+Replace `/path/to/browser-goat` with the absolute checkout path. Search and
+verification require a SearXNG instance with JSON search enabled. Extracting a
+known URL does not require SearXNG.
 
-If using a different port, update `SEARXNG_URL` in your MCP config accordingly.
+Client configuration schemas differ. Use the client's expected command,
+argument, and environment fields; a generic `mcpServers` example is not a
+universal configuration file. No client configuration is installed automatically.
 
-## MCP Tools
+## Other launch methods
 
-| Tool | Description |
-|------|-------------|
-| `search` | Full pipeline: intent detection -> SearXNG -> hybrid ranking -> extraction -> reliability -> answer |
-| `extract` | Fetch and extract a single URL with anti-bot bypass (Cloudflare Turnstile) |
+For an available published Python package, select the MCP executable with
+`uvx --from browser-goat browser-goat-mcp`. That command does not automatically
+use changes in a local checkout.
 
-Parameters for `search`: `time_range` (day/week/month/year), `max_sources`, `strategy` (default/auto/explore/decompose).
+The npm launcher also requires Node.js and a Python interpreter containing the
+backend. It does not install Python or the Python package. See
+[npm prerequisites](npm/README.md) for `PYTHON_CMD` and local-launch instructions.
+
+## Check the right service
+
+Compose publishes SearXNG on loopback port 8082 and the separate HTTP JSON API
+on port 8003. The API is not an MCP endpoint. An MCP handshake proves that the
+stdio server responds, not that SearXNG or a browser fetch tier is ready.
+See [local deployment](docs/deployment.md) for independent startup checks.

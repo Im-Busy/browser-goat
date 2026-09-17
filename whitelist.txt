@@ -1,5 +1,5 @@
-# Whitelist for public repo sync
-# Lines starting with # are ignored. Directories must end with /.
+# Public projection allowlist. Never merge private history into a public branch.
+# Expand directories to reviewed source files, excluding ignored/generated files.
 
 # === Source Code ===
 src/
@@ -8,9 +8,19 @@ src/
 tests/
 
 # === Documentation ===
-docs/
+docs/architecture.md
+docs/cli.md
+docs/configuration.md
+docs/deployment.md
+docs/docker.md
+docs/index.md
+docs/install.md
+docs/library.md
+docs/mcp.md
+docs/quickstart.md
 README.md
 ATTRIBUTION.md
+CLIENTS.md
 
 # === Project Config ===
 pyproject.toml
@@ -19,11 +29,25 @@ uv.lock
 
 # === Docker ===
 docker-compose.yml
-docker/
+docker/searxng/settings.yml
 Dockerfile
 
 # === npm/npx Channel ===
-npm/
+npm/index.js
+npm/package.json
+npm/README.md
+npm/LICENSE
+npm/.gitignore
+
+# === Portable client examples ===
+distribution/README.md
+distribution/claude-desktop/mcp-config.json
+distribution/copilot/mcp-config.json
+distribution/cursor/mcp-config.json
+distribution/mcp-configs/local.json
+distribution/mcp-configs/local-docker.json
+distribution/opencode/mcp-config.json
+distribution/windsurf/mcp-config.json
 
 # === License ===
 LICENSE

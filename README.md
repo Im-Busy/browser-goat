@@ -1,229 +1,174 @@
-# browser-goat — Production-grade web search for AI agents
+# browser-goat
 
-[![Tests](https://img.shields.io/badge/tests-304%20passed-brightgreen)](https://github.com/Im-Busy/browser-goat)
-[![Python](https://img.shields.io/badge/python-3.13%2B-blue?logo=python)](https://python.org)
-[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![PyPI](https://img.shields.io/badge/pypi-browser--goat-22c55e?logo=pypi)](https://pypi.org/project/browser-goat)
+A Python search pipeline around SearXNG for AI agents and applications. It
+classifies queries, ranks results, extracts page text, and optionally compares
+answers across multiple searches. Available as a library, CLI, HTTP JSON API,
+and MCP stdio server.
 
-> Six-stage search pipeline around SearXNG: query intent detection, hybrid BM25+MMR ranking, anti-bot content extraction, quality-gated retry, adaptive exploration, and multi-rollout consensus verification — running entirely on your own infrastructure.
+## Quick start
 
-[Quick Start](#quick-start) · [How to Use](#how-to-use) · [Architecture](#architecture) · [MCP Tools](#mcp-tools) · [Docker](#docker) · [Docs](#documentation) · [Development](#development)
+Requires Python 3.13+ and a SearXNG instance with JSON search enabled. From a
+checkout, start the bundled search backend:
 
-## Quick Start
+```bash
+uv sync --locked
+docker compose up -d redis searxng
+uv run browser-goat search "Python asyncio documentation" --max-sources 2
+uv run browser-goat extract "https://example.com"
+```
 
-Requires Python 3.13+ and a running SearXNG instance. Run `uvx browser-goat --guide` for full documentation.
+SearXNG uses host port `8082`. The full Compose stack also exposes the HTTP
+search API at `http://localhost:8003`. That API is **not an MCP endpoint**.
 
-### MCP (AI Agents)
+### MCP
+
+For a client that accepts `mcpServers` configuration:
 
 ```json
 {
   "mcpServers": {
     "browser-goat": {
-      "command": "npx",
-      "args": ["browser-goat"],
+      "command": "uvx",
+      "args": ["--from", "browser-goat", "browser-goat-mcp"],
       "env": { "SEARXNG_URL": "http://localhost:8082" }
     }
   }
 }
 ```
 
-See [CLIENTS.md](CLIENTS.md) for platform-specific configuration (Claude Desktop, Cursor, OpenCode, GitHub Copilot, Windsurf).
+The npm wrapper is an alternative: `npx browser-goat`. It requires an existing
+Python installation containing `browser-goat`; set `PYTHON_CMD` to that
+interpreter's path. It does not install Python or the Python package.
+See [MCP integration](docs/mcp.md) and [npm prerequisites](npm/README.md).
 
-### CLI
-
-```bash
-uvx browser-goat search "latest AI research"
-uvx browser-goat search "Python vs Rust" --strategy explore
-uvx browser-goat extract "https://example.com/article"
-```
-
-### Library
+### Python library
 
 ```python
+import asyncio
 from browser_goat import BrowserGoat
 
-meta = BrowserGoat(searxng_url="http://localhost:8082")
-result = await meta.search("quantum computing")
-print(result.answer)
+async def main() -> None:
+    async with BrowserGoat(searxng_url="http://localhost:8082") as goat:
+        result = await goat.search("Python asyncio documentation", max_sources=2)
+        print(result.answer)
+
+asyncio.run(main())
 ```
 
-## How to Use
+## Behavior and limits
 
-Each example is copy-paste ready. All require Docker Compose running (`docker compose up`).
+- `default` (alias `direct`) runs query analysis, SearXNG, URL cleanup,
+  RRF/BM25+/MMR ranking, extraction, and quality checks.
+- `explore` merges results from multiple query variants before ranking. Without
+  an LLM, it uses the direct query and available rule-based synonyms.
+- `decompose` uses an explicitly supplied library chat callback for recursive
+  subtasks. Without that callback, it falls back to the default search path.
+- `auto` chooses a strategy from query classification.
+- `high` requests five rollouts; `maximum` requests eight. Four matching
+  normalized answers can stop remaining work. A plurality is retained even
+  without consensus. `verify --rollouts N` accepts 3-8, with actual completions
+  reported in `rollouts_run`.
+- Verification has a **40-second shared collection budget**, including any
+  optional LLM tie-breaker. At the deadline, unfinished rollouts and their page
+  fetches are cancelled and drained before returning completed results. Cleanup
+  can add latency; this is not a hard 40-second transport guarantee.
+  `verification` reports `timed_out`, `partial`, `stop_reason`,
+  `requested_rollouts`, `failed_rollouts`, and `cancelled_rollouts`. No usable
+  completions means `method="rollout_failure"` and `quality_passed=false`, not
+  successful empty output.
+- Standalone `verify` (library, CLI, MCP) requests **three sources per rollout**
+  to avoid spending its whole deadline on low-ranked slow pages. `search` with
+  high/maximum reliability retains the caller's `max_sources`; it uses the same
+  collection deadline. One completed answer remains a non-consensus fallback.
+- Verification measures agreement, **not factual truth**. Failed quality
+  checks are excluded from voting. A single surviving answer is not consensus.
+- No LLM is required. Ordinary answers list extracted source summaries.
+  `BROWSER_GOAT_LLM` optionally configures verification tie-breaking; it does
+  not enable decomposition or extraction enrichment. No configured LLM means
+  tie-breaking is reported as `fallback`, not `llm`.
+- Quality checks report failures; the basic pipeline does not synthesize or
+  retry an answer. `force_answer_used` stays false when no synthesis ran.
+- Search engines and target sites still impose limits. Browser-backed fetch
+  tiers are best-effort, not a guarantee of access to every site.
+
+## Extraction backends
+
+Fetching tries HTTPX, Scrapling, Scrapling with challenge solving, Crawl4AI,
+Playwright, then plain HTTPX. HTML-to-text extraction is a separate seven-tier
+cascade.
+
+HTTP 200 is not enough: blank pages, known challenge screens, and JavaScript-only
+shells continue to the next tier and are not cached. Concurrent requests for
+the same URL share an in-flight fetch. This heuristic does not recognize every
+anti-bot page or establish topical relevance.
+
+Install browser binaries for browser-backed fetch tiers:
 
 ```bash
-# Basic search — fires all six pipeline stages automatically
-uvx browser-goat search "latest AI research developments 2025"
-
-# Factual query — intent detection identifies this as a Factual query
-# and routes it through direct-answer optimization (no exploration overhead)
-uvx browser-goat search "capital of France"
-
-# Time-filtered — restricts SearXNG results to the past week
-uvx browser-goat search "AI regulation news" --time-range week
-
-# Deep research — enables adaptive exploration with recursive decomposition
-uvx browser-goat search "quantum computing applications in drug discovery" --strategy explore
-
-# High reliability — triggers multi-rollout verification and consensus voting
-# (also try --reliability maximum for 8 rollouts with LLM tie-breaking)
-uvx browser-goat search "clinical trial results for mRNA vaccines" --reliability high
-
-# Extract a page — fetches and cleans any URL with anti-bot bypass
-uvx browser-goat extract "https://en.wikipedia.org/wiki/Python_(programming_language)"
-
-# Programmatic — same pipeline, accessible from Python
-```python
-from browser_goat import BrowserGoat
-
-goat = BrowserGoat(searxng_url="http://localhost:8082")
-result = await goat.search("Rust vs Go performance benchmarks 2025")
-print(f"Answer: {result.answer}")
-print(f"Sources: {len(result.sources)} pages — extraction_rate={result.extraction_success_rate}")
-# Response shape: { answer, sources, query_intent, engines_used, reliability, verification, timestamp }
+uv run playwright install chromium
+uv run patchright install chromium
 ```
 
-# MCP tool call — an AI agent invokes the search tool (conceptual)
-# The agent sends: search(query="Rust vs Go", time_range="year", reliability_mode="high")
-# browser-goat returns structured JSON with answer + sources + reliability + verification metadata
-```
-
-### Which Interface Should I Use?
-
-| You are... | Use... | Because... |
-|-----------|--------|-----------|
-| An AI agent (Claude, Cursor, OpenCode) | **MCP** | Tools appear in the agent's tool list. Zero config beyond the JSON snippet. |
-| Prototyping or scripting | **CLI** | `uvx browser-goat search "query"` — instant results, no code. |
-| Building an application | **Library** | Full control over pipeline parameters, async integration, result parsing. |
-| Running a service | **Docker** | `docker compose up` — SearXNG + browser-goat as a sidecar. |
-
-**Skip browser-goat if** you only need raw search snippets (use SearXNG directly) or you're already happy with a managed API like Tavily or Exa. browser-goat adds overhead for a reason — if you don't need ranked, extracted, verified answers, the pipeline is more than you want.
-
-## Why browser-goat?
-
-SearXNG is powerful but raw — it returns search results, not answers. browser-goat wraps it with six processing layers that turn those results into verified, structured answers that AI agents can trust. Each layer ports specific innovations from SearchWala, local-deep-research, Marco-DeepResearch, Tongyi-DeepResearch, and Scrapling.
-
-## Features
-
-- **Self-hosted** — No API keys, no rate limits, no third-party dependency. Your SearXNG, your infrastructure.
-- **Six processing layers** — Intent detection → SearXNG → Hybrid ranking (RRF + BM25 + MMR) → Content extraction → Quality-gated retry → Answer
-- **Anti-bot bypass** — Cloudflare Turnstile solving via Scrapling. Pages that block scrapers work.
-- **CJK language support** — Chinese, Japanese, and Korean queries route through appropriate search engines.
-- **Multi-rollout verification** — Run 5–8 parallel searches, vote on consensus, verify ties with an LLM (optional).
-- **Three interfaces, one engine** — MCP server for AI agents, CLI for scripting, Python library for integration.
-
-## Architecture
-
-```mermaid
----
-config:
-  theme: neutral
-  htmlLabels: false
----
-flowchart TD
-    Q["Query"] --> L1
-
-    subgraph L1 [1. Pre-Search]
-        A["`Intent detection\nBrowser profiles\nLanguage detection`"]
-    end
-
-    L1 --> SX["SearXNG Engine"]
-
-    SX --> L2
-    subgraph L2 [2. Post-Search]
-        B["`URL normalization\nRRF + BM25 + MMR`"]
-    end
-
-    L2 --> L3
-    subgraph L3 [3. Extraction]
-        C["`7-tier cascading\nAnti-bot bypass\nGoal-oriented summary`"]
-    end
-
-    L3 --> L4
-    subgraph L4 [4. Reliability]
-        D["`Give-up detection\nQuality-gated retry\nForce synthesis`"]
-    end
-
-    L4 --> L5
-    subgraph L5 [5. Strategy]
-        E["`Query classification\nAdaptive exploration\nRecursive decomposition`"]
-    end
-
-    L5 --> L6
-    subgraph L6 [6. Verification]
-        F["`Multi-rollout voting\nConsensus verification\nLLM tie-breaking`"]
-    end
-
-    L6 --> A["Answer"]
-
-    style L1 fill:#22c55e,stroke:#166534,color:#fff
-    style L2 fill:#16a34a,stroke:#15803d,color:#e0e0e0
-    style L3 fill:#15803d,stroke:#14532d,color:#e0e0e0
-    style L4 fill:#14532d,stroke:#166534,color:#e0e0e0
-    style L5 fill:#166534,stroke:#14532d,color:#e0e0e0
-    style L6 fill:#052e16,stroke:#22c55e,color:#e0e0e0
-```
-
-| Layer | What It Does | Source |
-|-------|-------------|--------|
-| **Pre-Search** | Intent detection (6 types), 20 browser profiles, CJK-aware parameters | SearchWala + Tongyi |
-| **Post-Search** | URL normalization, RRF (k=60) + BM25+ + MMR (λ=0.7) | SearchWala |
-| **Extraction** | 7-tier cascading, goal-oriented summaries, anti-bot bypass | SearchWala + Scrapling |
-| **Reliability** | 43 give-up patterns, quality-gated retry, force synthesis | Marco + SearchWala |
-| **Strategy** | Query classification, adaptive exploration, recursive decomposition | local-deep-research |
-| **Verification** | Multi-rollout voting, consensus verification, LLM tie-breaking | Marco |
+Linux hosts also need browser system libraries (`playwright install --with-deps
+chromium`). The Dockerfile installs these. Crawl4AI supports optional proxy
+rotation through `CRAWL4AI_PROXY_LIST`; no proxy service is bundled.
 
 ## Configuration
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `SEARXNG_URL` | `http://localhost:8082` | SearXNG instance URL |
-| `BROWSER_GOAT_LLM` | (none) | LLM for verification tie-breaking. Format: `openai:gpt-4o-mini` or `ollama:llama3`. Optional — voting works without it. |
-| `BROWSER_GOAT_OPENAI_API_KEY` | (none) | API key when using `BROWSER_GOAT_LLM=openai:*` |
-| `BROWSER_GOAT_OLLAMA_HOST` | `http://localhost:11434` | Ollama host when using `BROWSER_GOAT_LLM=ollama:*` |
+| Variable | Default | Purpose |
+|---|---|---|
+| `SEARXNG_URL` | `http://localhost:8082` | Search backend |
+| `CONTENT_CACHE_TTL_SECONDS` | `900` | In-process HTML cache TTL; `0` disables reuse |
+| `CONTENT_CACHE_MAX_ENTRIES` | `256` | LRU entry limit; `0` disables storage |
+| `CRAWL4AI_PROXY_LIST` | empty | Comma-separated proxy URLs for the Crawl4AI tier |
+| `BROWSER_GOAT_LLM` | empty | Optional verifier provider, such as `ollama:llama3` |
+| `BROWSER_GOAT_OLLAMA_HOST` | `http://localhost:11434` | Ollama endpoint |
+| `BROWSER_GOAT_OPENAI_API_KEY` | empty | Optional OpenAI verifier credential |
 
-## Compared to Alternatives
+Native `serve` and `service start` bind to `127.0.0.1` by default. Docker's
+explicit internal `0.0.0.0` binding remains behind a loopback Compose host port.
+Do not expose the unauthenticated HTTP API to an untrusted network. See
+[configuration](docs/configuration.md) and [Docker deployment](docs/docker.md).
 
-| Tool | browser-goat | Raw SearXNG | Tavily / Exa |
-|------|:---:|:---:|:---:|
-| Self-hosted | ✅ Your infrastructure | ✅ Your infrastructure | ❌ API service |
-| Structured answers | ✅ Full pipeline output | ❌ Returns search snippets | ✅ API returns structured data |
-| Multi-source verification | ✅ Consensus voting across rollouts | ❌ | ❌ |
-| Anti-bot bypass | ✅ Scrapling + Playwright | ❌ | ✅ Proprietary |
-| Rate limits | None | Your SearXNG config | Tiered plans |
-| API key required | No | No | Yes |
-
-## MCP Tools
-
-| Tool | Description |
-|------|-------------|
-| `search` | Full pipeline: intent -> SearXNG -> ranking -> extraction -> reliability. Supports `time_range`, `max_sources`, `strategy`, `reliability_mode`. |
-| `extract` | Fetch and extract a single URL with anti-bot bypass (Cloudflare Turnstile). |
-| `verify` | Run multi-rollout verification on a claim by issuing parallel searches and voting on consensus. |
-
-See [CLIENTS.md](CLIENTS.md) for platform-specific MCP configuration snippets.
-
-## Docker
+## Development and verification
 
 ```bash
-docker compose up   # SearXNG at localhost:8082, API at localhost:8003
+uv run pytest
+uv run ruff check src/ tests/
+uv run mypy src/
 ```
+
+The default suite is offline: unit tests use mocks, full-path smoke tests use a
+local SearXNG-shaped HTTP fixture, and load tests use a local fake server. LLM
+providers are disabled in tests. These checks do not prove live engine or
+anti-bot compatibility. Tests marked `integration` require explicit opt-in
+(`uv run pytest --live -m integration`) and make external requests.
+
+For a bounded local-interface smoke run:
+
+```bash
+uv run pytest tests/test_interfaces.py tests/test_repair_regressions.py
+```
+
+This exercises the library strategy/reliability matrix, CLI JSON and pretty
+output, HTTP validation/errors, Python MCP stdio, and npm MCP stdio. Node.js is
+required for the npm smoke test. Browser adapters use deterministic tests;
+real browser binaries and external services require separate live validation.
+
+After installing the declared dependencies and browser binaries, run
+`uv run pytest tests/test_interfaces.py --browser-local -m browser_local` to
+exercise Scrapling, Crawl4AI, and Playwright on local HTML. This does not test
+external anti-bot challenge solving.
 
 ## Documentation
 
-Run `uvx browser-goat --guide` for the built-in usage reference.
-
-For MCP integration across Claude Desktop, Cursor, OpenCode, GitHub Copilot, and Windsurf, see [CLIENTS.md](CLIENTS.md). Architecture details and design decisions live in [developer_docs/](developer_docs/).
-
-## Development
-
-```bash
-git clone https://github.com/Im-Busy/browser-goat.git && cd browser-goat && uv sync
-uv run pytest                  # 304 tests
-uv run ruff check src/ tests/  # zero violations
-uv run mypy src/               # zero errors
-```
+- [Installation](docs/install.md) and [quickstart](docs/quickstart.md)
+- [CLI and HTTP API](docs/cli.md)
+- [Python API](docs/library.md)
+- [MCP tools](docs/mcp.md)
+- [Configuration](docs/configuration.md)
+- [Docker deployment](docs/docker.md)
 
 ## License
 
-MIT
+[MIT](LICENSE).

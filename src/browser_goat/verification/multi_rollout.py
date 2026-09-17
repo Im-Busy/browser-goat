@@ -8,6 +8,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
+import time
+from dataclasses import dataclass
 from typing import Any, cast
 
 from browser_goat.models import RolloutConfig, SearchResult
@@ -30,6 +33,16 @@ _TIME_RANGES: list[str | None] = [None, "month", "year"]
 _NUM_PROFILES: int = len(PROFILES)
 
 
+@dataclass
+class RolloutProgress:
+    """Per-call collection state; never shared between concurrent verifications."""
+
+    failed_rollouts: int = 0
+    cancelled_rollouts: int = 0
+    timed_out: bool = False
+    stop_reason: str = "completed"
+
+
 class MultiRollout:
     """N-parallel full-pipeline searches with parameter variation.
 
@@ -39,7 +52,7 @@ class MultiRollout:
 
     Usage::
 
-        meta = BrowserGoat(searxng_url="http://localhost:8080")
+        meta = BrowserGoat(searxng_url="http://localhost:8082")
         mr = MultiRollout()
         results = await mr.execute("What happened in the 2024 election?",
                                     meta=meta,
@@ -51,6 +64,7 @@ class MultiRollout:
     DEFAULT_ROLLOUTS: int = 5
     EARLY_STOP_THRESHOLD: int = 4
     MAX_ROLLOUTS: int = 8
+    COLLECTION_TIMEOUT_SECONDS: float = 40.0
 
     # ── Config generation ─────────────────────────────────────────────────
 
@@ -78,10 +92,8 @@ class MultiRollout:
         configs: list[RolloutConfig] = []
         for i in range(num_rollouts):
             profile_name = profile_names[i % _NUM_PROFILES]
-            engines = _ENGINE_SUBSETS[(i // _NUM_PROFILES) % num_subsets]
-            time_range = _TIME_RANGES[
-                (i // (_NUM_PROFILES * num_subsets)) % num_times
-            ]
+            engines = _ENGINE_SUBSETS[i % num_subsets]
+            time_range = _TIME_RANGES[(i // num_subsets) % num_times]
 
             configs.append(
                 RolloutConfig(
@@ -108,6 +120,9 @@ class MultiRollout:
         meta: Any,
         num_rollouts: int = 5,
         answer_voter: AnswerVoter | None = None,
+        search_options: dict[str, Any] | None = None,
+        timeout_seconds: float | None = None,
+        progress: RolloutProgress | None = None,
     ) -> list[SearchResult]:
         """Execute *num_rollouts* parallel searches with parameter variation.
 
@@ -124,6 +139,12 @@ class MultiRollout:
         answer_voter:
             Optional ``AnswerVoter`` instance.  When ``None`` (the default)
             a fresh instance is created.
+        timeout_seconds:
+            Shared collection budget (default 40 seconds), not a per-rollout timeout.
+            Pending work is cancelled and drained before return; cleanup may add latency.
+        progress:
+            Optional per-call metadata populated with failures, cancellation count,
+            and whether collection stopped at its deadline or early consensus.
 
         Returns
         -------
@@ -148,6 +169,11 @@ class MultiRollout:
         Completion is tracked via ``asyncio.wait(FIRST_COMPLETED)`` so that
         we can react to answers as soon as they arrive.
         """
+        budget = self.COLLECTION_TIMEOUT_SECONDS if timeout_seconds is None else timeout_seconds
+        if not math.isfinite(budget) or budget <= 0:
+            raise ValueError("Rollout timeout must be finite and positive")
+        deadline = time.monotonic() + budget
+        progress = progress if progress is not None else RolloutProgress()
         # Clamp to allowed range
         num_rollouts = min(max(num_rollouts, 1), self.MAX_ROLLOUTS)
 
@@ -185,11 +211,17 @@ class MultiRollout:
         # ── Launch all rollouts as parallel tasks ─────────────────────────
 
         async def _run_one(config: RolloutConfig) -> SearchResult:
+            options: dict[str, Any] = {
+                "engines": config.engines,
+                "time_range": config.time_range,
+                "language": "auto",
+            }
+            options.update(search_options or {})
+            # Never recursively trigger verification in a rollout.
+            options["reliability_mode"] = "standard"
             result = await meta.search(
                 query=config.query,
-                engines=config.engines,
-                time_range=config.time_range,
-                language=config.language,
+                **options,
             )
             return cast(SearchResult, result)
 
@@ -200,33 +232,38 @@ class MultiRollout:
 
         # ── Process completions as they arrive ────────────────────────────
 
-        while pending:
-            done, pending = await asyncio.wait(
-                pending,
-                return_when=asyncio.FIRST_COMPLETED,
-            )
-
-            # Collect completed results (skip cancelled tasks)
-            for task in done:
-                if not task.cancelled():
-                    try:
-                        result = task.result()
-                        results.append(result)
-                    except Exception:
-                        # Individual rollout failure — log the cause so
-                        # users can diagnose WHY (e.g. SearXNG unreachable)
-                        logger.exception("Rollout %s failed", task.get_name())
-                        continue
-
-            # ── Early-stop check ──────────────────────────────────────────
-            if len(results) >= self.EARLY_STOP_THRESHOLD:
-                answers = [self._extract_answer(r) for r in results]
-                vote = answer_voter.vote(answers)
-                if vote.consensus and vote.winner_answer is not None:
-                    # Consensus reached — cancel remaining tasks
-                    for t in pending:
-                        t.cancel()
+        all_tasks = set(pending)
+        try:
+            while pending:
+                remaining = max(0.0, deadline - time.monotonic())
+                done, pending = await asyncio.wait(
+                    pending, timeout=remaining, return_when=asyncio.FIRST_COMPLETED,
+                )
+                for task in sorted(done, key=lambda t: t.get_name()):
+                    if not task.cancelled():
+                        try:
+                            results.append(task.result())
+                        except Exception:
+                            progress.failed_rollouts += 1
+                            logger.exception("Rollout %s failed", task.get_name())
+                    else:
+                        progress.cancelled_rollouts += 1
+                if pending and (not done or time.monotonic() >= deadline):
+                    progress.timed_out = True
+                    progress.stop_reason = "deadline"
                     break
+                if len(results) >= self.EARLY_STOP_THRESHOLD:
+                    answers = [self._extract_answer(r) for r in results if r.reliability.quality_passed]
+                    vote = answer_voter.vote(answers)
+                    if max(vote.vote_counts.values(), default=0) >= self.EARLY_STOP_THRESHOLD:
+                        progress.stop_reason = "consensus" if pending else "completed"
+                        break
+        finally:
+            for task in all_tasks:
+                if not task.done():
+                    progress.cancelled_rollouts += 1
+                    task.cancel()
+            await asyncio.gather(*all_tasks, return_exceptions=True)
 
         return results
 

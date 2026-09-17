@@ -12,15 +12,25 @@ from browser_goat import BrowserGoat
 
 ```python
 BrowserGoat(
-    searxng_url: str = "http://localhost:8080",
+    searxng_url: str | None = None,
     llm_call: Any = None,
+    cache_ttl_seconds: float | None = None,
+    cache_max_entries: int | None = None,
 )
 ```
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| `searxng_url` | `str` | `"http://localhost:8080"` | Base URL of a running SearXNG instance. |
+| `searxng_url` | `str \| None` | `None` | Explicit URL, otherwise `SEARXNG_URL`, otherwise `http://localhost:8082`. |
 | `llm_call` | `Any` | `None` | Optional async callable for LLM-powered goal-oriented extraction. When provided, extracted sources include structured rational/evidence/summary fields. When omitted, extraction runs without LLM enrichment. |
+| `cache_ttl_seconds` | `float \| None` | `None` | Override `CONTENT_CACHE_TTL_SECONDS` (default 900); non-negative. |
+| `cache_max_entries` | `int \| None` | `None` | Override `CONTENT_CACHE_MAX_ENTRIES` (default 256); non-negative. |
+
+`llm_call` receives a list of chat messages and returns a string asynchronously.
+It is shared by goal extraction, classification, exploration, decomposition,
+and the adapted verifier. Without it, only the verifier can use
+`BROWSER_GOAT_LLM`; other stages stay rule-based. Source evidence and summaries
+then contain bounded excerpts, not LLM-generated assertions.
 
 ---
 
@@ -31,7 +41,7 @@ async def search(
     query: str,
     engines: list[str] | None = None,
     time_range: str | None = None,
-    language: str = "en",
+    language: str = "auto",
     max_sources: int = 15,
     strategy: str = "default",
     reliability_mode: str = "standard",
@@ -45,8 +55,8 @@ Execute a full search through every active pipeline layer. Returns a `SearchResu
 | `query` | `str` | *(required)* | Natural language search query. |
 | `engines` | `list[str] \| None` | `None` | SearXNG engine names to use (e.g. `["google", "bing"]`). When `None`, engines are selected automatically based on the query's detected language. |
 | `time_range` | `str \| None` | `None` | Time filter: `"day"`, `"week"`, `"month"`, or `"year"`. Limits results to the given window. |
-| `language` | `str` | `"en"` | Language code for results and query analysis. Used for engine selection and language-aware search parameters. |
-| `max_sources` | `int` | `15` | Maximum number of page fetches and extractions after ranking. Controls depth-vs-latency trade-off. |
+| `language` | `str` | `"auto"` | Detect from query; an explicit code overrides detection. |
+| `max_sources` | `int` | `15` | 1-50 page extractions per pass, including each verification rollout. |
 | `strategy` | `str` | `"default"` | Pipeline strategy. See [Strategy modes](#strategy-modes) below. |
 | `reliability_mode` | `str` | `"standard"` | Verification intensity. See [Reliability modes](#reliability-modes) below. |
 
@@ -57,15 +67,16 @@ Execute a full search through every active pipeline layer. Returns a `SearchResu
 | `"default"` | Standard pipeline: pre-search → SearXNG → ranking → extraction → reliability. One pass, fastest result. |
 | `"auto"` | Classify the query, then route to `"explore"` (for research queries), `"decompose"` (for complex/puzzle queries), or `"default"` (everything else). |
 | `"explore"` | Multi-angle adaptive exploration. Generates and searches candidate query variations, then merges the best results. |
-| `"decompose"` | Recursive decomposition. Splits complex queries into subtasks, solves each independently, and aggregates. |
+| `"decompose"` | Recursive decomposition with `llm_call`; falls back to default search without it. |
+| `"direct"` | Alias for `"default"`. |
 
 #### Reliability modes
 
 | Value | Rollouts | Verification |
 |---|---|---|
 | `"standard"` | 1 | Single pipeline pass with give-up detection and quality gate. |
-| `"high"` | 5 | Five independent searches with consensus voting. Returns the answer agreed upon by at least 4 of 5 rollouts. |
-| `"maximum"` | 8 | Eight rollouts with consensus voting plus LLM tie-breaking when no clear winner emerges. |
+| `"high"` | up to 5 | Consensus at four matching answers; otherwise returns the plurality or a tied candidate. |
+| `"maximum"` | up to 8 | Consensus voting plus optional LLM tie-breaking; no LLM means an explicit fallback. |
 | `"auto"` | *(adaptive)* | Adaptively selects mode based on query complexity and intent classification. |
 
 #### Return type: SearchResult
@@ -87,13 +98,13 @@ Execute a full search through every active pipeline layer. Returns a `SearchResu
 
 ### extract()
 
-> **Note:** This method is available through the MCP server and CLI interfaces. It fetches and extracts content from a single URL using the same anti-bot bypass and 7-tier extraction stack used internally by `search()`.
+Available in the library, CLI, and MCP. It shares the HTML cache with search.
 
 ```python
-async def extract(url: str) -> ExtractedContent
+async def extract(url: str) -> dict[str, Any]
 ```
 
-#### Return type: ExtractedContent
+#### Return fields
 
 | Field | Type | Description |
 |---|---|---|
@@ -101,8 +112,25 @@ async def extract(url: str) -> ExtractedContent
 | `title` | `str` | Page title extracted from `<title>` or structured metadata. Empty string if none found. |
 | `text` | `str` | Clean article text. Site chrome, navigation, ads, and sidebars are stripped. |
 | `extraction_tier` | `int` | Which of the 7 extraction tiers succeeded. Tier 1 (JSON-LD structured data) is fastest. Tier 7 (full body fallback) is last resort. |
-| `word_count` | `int` | Word count of the extracted text. |
-| `metadata` | `dict[str, Any]` | Additional metadata discovered during extraction (author, publish date, description, etc.). |
+| `text_length` | `int` | Length of the full returned text. |
+| `success` | `bool` | False when fetching fails or no text can be extracted. |
+| `error` | `str \| None` | Failure description. Fetch failures omit the text fields. |
+
+### verify() and cache helpers
+
+`await goat.verify(query, rollouts=5)` accepts 3-8 rollouts. It returns the
+search-result fields plus `query`, `rollouts_run`, `vote_counts`, and
+`candidates`. Verification metadata records actual completions, agreement,
+and the method (`consensus`, `llm`, `fallback`, or `rollout_failure`). Failed
+quality checks are not votes; one surviving result is not consensus. The
+selected answer retains its own source list and metrics.
+
+`goat.cache_stats()` returns hits, misses, size, capacity, TTL, and hit rate.
+`goat.clear_cache()` clears cached HTML and resets counters.
+Concurrent misses for one exact URL share a bounded in-flight task. Failures
+are not cached. Cancelling a waiter leaves other consumers running; the last
+waiter cancels and drains the fetch. `close()` drains all outstanding fetches
+and is terminal for that instance. See [cache configuration](configuration.md#reliability-and-cache).
 
 ---
 
@@ -121,7 +149,7 @@ Close all internal HTTP clients and release resources. Call this when you are do
 The preferred way to use `BrowserGoat` is as an async context manager, which ensures `close()` is called automatically:
 
 ```python
-async with BrowserGoat(searxng_url="http://localhost:8080") as goat:
+async with BrowserGoat(searxng_url="http://localhost:8082") as goat:
     result = await goat.search("quantum computing breakthroughs 2026")
     print(result.answer)
     for source in result.sources:
@@ -169,8 +197,8 @@ Aggregated reliability checks applied to every search result.
 | `give_up_detected` | `bool` | Whether the answer matched a known give-up pattern (e.g. "I couldn't find any results"). |
 | `give_up_pattern` | `str \| None` | The specific regex pattern that matched, if any. |
 | `quality_passed` | `bool` | Whether the answer passed the quality gate (minimum length, citation presence). |
-| `quality_retries` | `int` | Number of quality-gate retries used. |
-| `force_answer_used` | `bool` | Whether a force-synthesis prompt was used after repeated failures. |
+| `quality_retries` | `int` | Zero for the basic pipeline, which does not retry synthesis. |
+| `force_answer_used` | `bool` | False when no force synthesis was performed. |
 
 ### QueryIntent
 
@@ -194,8 +222,9 @@ All search operations may raise the following exceptions:
 | Exception | Cause |
 |---|---|
 | `httpx.HTTPStatusError` | SearXNG returned a non-2xx status code. Check that the instance is running and the URL is correct. |
-| `ConnectionError` | SearXNG is unreachable. Verify the instance is running at the configured `searxng_url`. |
-| `TimeoutException` | The search or page fetch exceeded the configured timeout. Increase the timeout or reduce `max_sources`. |
+| `httpx.ConnectError` | SearXNG is unreachable. Check the configured URL and backend service. |
+| `httpx.TimeoutException` | The SearXNG request timed out. |
+| `ValueError` | Invalid query/options or malformed SearXNG JSON. |
 
 These exceptions are raised by the underlying `httpx.AsyncClient` and propagate directly. Wrap calls in `try`/`except` to handle them:
 
@@ -209,9 +238,9 @@ try:
     result = await goat.search("machine learning tutorials")
 except httpx.HTTPStatusError as exc:
     print(f"SearXNG error: {exc.response.status_code}")
-except ConnectionError:
+except httpx.ConnectError:
     print("SearXNG is not running. Start it with: docker compose up")
-except TimeoutError:
+except httpx.TimeoutException:
     print("Search timed out. Try a narrower query or reduce max_sources.")
 finally:
     await goat.close()
@@ -226,7 +255,7 @@ import asyncio
 from browser_goat import BrowserGoat
 
 async def main() -> None:
-    async with BrowserGoat(searxng_url="http://localhost:8080") as goat:
+    async with BrowserGoat(searxng_url="http://localhost:8082") as goat:
         # Basic search
         result = await goat.search("Python async programming patterns")
 

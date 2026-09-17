@@ -7,9 +7,9 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
-from typing import Any
+from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 # ── Query Analysis ────────────────────────────────────────────────────────────
 
@@ -124,6 +124,7 @@ class FetchResult(BaseModel):
     success: bool = False
     error: str | None = None
     used_scrapling: bool = False
+    used_crawl4ai: bool = False  # Tier 4 — Crawl4AI v0.8+ handled the fetch
     fetch_tier: int = 0  # which escalation tier succeeded (1-6)
     latency_ms: int = 0
 
@@ -213,14 +214,21 @@ class SearchResult(BaseModel):
 class SearchRequest(BaseModel):
     """Input to BrowserGoat.search()."""
 
-    query: str
+    query: str = Field(min_length=1)
     engines: list[str] | None = None
-    time_range: str | None = None  # day, week, month, year
-    language: str = "en"
-    max_sources: int = 15
-    reliability_mode: str = "standard"  # standard | high | maximum
-    strategy: str = "auto"  # auto | default | explore | decompose
+    time_range: Literal["day", "week", "month", "year"] | None = None
+    language: str = Field(default="auto", min_length=1)
+    max_sources: int = Field(default=15, ge=1, le=50, strict=True)
+    reliability_mode: Literal["standard", "high", "maximum", "auto"] = "standard"
+    strategy: Literal["auto", "default", "direct", "explore", "decompose"] = "auto"
     llm_config: dict[str, Any] | None = None  # for goal-oriented extraction
+
+    @field_validator("query")
+    @classmethod
+    def nonblank_query(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("query must not be blank")
+        return value
 
 
 # ── Phase 2: Strategy Layer Models ────────────────────────────────────────────
@@ -253,6 +261,7 @@ class DecomposedResult(BaseModel):
     depth: int = 0
     aggregated_answer: str = ""
     intermediate_results: list[SubTask] = Field(default_factory=list)
+    results: list[RawSearchResult] = Field(default_factory=list)
 
 
 class StrategyStats(BaseModel):
@@ -269,6 +278,7 @@ class ExploreResult(BaseModel):
 
     strategy_stats: list[StrategyStats] = Field(default_factory=list)
     candidates: list[str] = Field(default_factory=list)
+    results: list[RawSearchResult] = Field(default_factory=list)
     total_attempts: int = 0
     adapted_strategy: str | None = None  # which strategy was promoted after adaptation
 
@@ -304,6 +314,13 @@ class VerificationResult(BaseModel):
     method: str = "vote"  # vote or llm
     is_consensus: bool = False
     rollout_count: int = 0
+    requested_rollouts: int = 0
+    failed_rollouts: int = 0
+    cancelled_rollouts: int = 0
+    timed_out: bool = False
+    partial: bool = False
+    stop_reason: str = "completed"
+    timeout_seconds: float = 0.0
 
 
 class RolloutConfig(BaseModel):

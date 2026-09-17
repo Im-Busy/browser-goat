@@ -2,7 +2,7 @@
 
 These tests start browser-goat as subprocesses (CLI, HTTP serve, MCP stdio),
 send real requests, validate responses, and clean up. They require a running
-SearXNG instance at the URL specified by SEARXNG_URL env var (default localhost:8080).
+SearXNG instance at the URL specified by SEARXNG_URL env var (default localhost:8082).
 
 Skip these tests with: pytest -m "not integration"
 """
@@ -20,7 +20,7 @@ from typing import Any
 import httpx
 import pytest
 
-SEARXNG_URL = os.environ.get("SEARXNG_URL", "http://localhost:8080")
+SEARXNG_URL = os.environ.get("SEARXNG_URL", "http://localhost:8082")
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 UV = "uv"
 

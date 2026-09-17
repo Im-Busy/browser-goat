@@ -134,3 +134,11 @@ class TestRank:
         ranker = HybridRanker()
         ranked = ranker.rank([], "query")
         assert ranked == []
+
+    def test_blocked_and_duplicate_results_never_enter_scoring(self) -> None:
+        results = [_make_result(f"https://example.com/{i}", "Python documentation " * 5) for i in range(3)]
+        results[0].blocked_reason = "blocked_domain_or_extension"
+        results[1].is_duplicate = True
+        ranker = HybridRanker()
+        assert [r.url for r in ranker._compute_rrf(results)] == [results[2].url]
+        assert [r.url for r in ranker.rank(results, "Python", max_results=1)] == [results[2].url]

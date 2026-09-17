@@ -16,9 +16,14 @@ RUN uv sync --frozen --no-dev --no-install-project
 
 # Copy source code
 COPY src/ src/
+COPY README.md LICENSE ./
 
 # Install the project itself
 RUN uv sync --frozen --no-dev
+
+# Browser-backed tiers require binaries and Linux runtime libraries.
+RUN uv run --no-sync playwright install --with-deps chromium \
+    && uv run --no-sync patchright install chromium
 
 # Expose the service port
 EXPOSE 8000

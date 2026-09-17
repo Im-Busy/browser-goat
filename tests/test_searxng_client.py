@@ -11,15 +11,15 @@ from browser_goat.searxng_client import SearXNGClient
 class TestSearXNGClient:
     def test_init_default_url(self) -> None:
         client = SearXNGClient()
-        assert client.base_url == "http://localhost:8080"
+        assert client.base_url == "http://localhost:8082"
 
     def test_init_custom_url(self) -> None:
         client = SearXNGClient("http://searxng:9090")
         assert client.base_url == "http://searxng:9090"
 
     def test_init_strips_trailing_slash(self) -> None:
-        client = SearXNGClient("http://localhost:8080/")
-        assert client.base_url == "http://localhost:8080"
+        client = SearXNGClient("http://localhost:8082/")
+        assert client.base_url == "http://localhost:8082"
 
 
 class TestBuildHeaders:
@@ -130,3 +130,12 @@ class TestParseResults:
         }
         results = client._parse_results(data)
         assert results[0].parsed_url == "https://example.com/cleaned"
+
+    def test_nullable_fields_and_invalid_scores_do_not_abort_batch(self) -> None:
+        results = SearXNGClient()._parse_results({"results": [
+            {"url": "https://example.com", "title": None, "score": None},
+            {"url": "https://example.com/2", "content": None, "score": "bad"},
+            {"url": []},
+        ]})
+        assert len(results) == 2
+        assert results[0].title == "" and results[1].score == 0

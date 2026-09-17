@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from unittest.mock import MagicMock, patch
 
 from browser_goat.extraction.goal_oriented import GoalOrientedExtractor
 from browser_goat.models import ExtractedContent
@@ -26,8 +27,13 @@ class TestGoalOrientedExtractor:
     def test_truncate_to_tokens(self) -> None:
         extractor = GoalOrientedExtractor()
         long_text = "hello world " * 50000
-        truncated = extractor._truncate_to_tokens(long_text, 100)
-        assert len(extractor._tokenizer.encode(truncated)) <= 100
+        # Exercise truncation without downloading a vendor-hosted tokenizer file.
+        encoding = MagicMock()
+        encoding.encode.side_effect = lambda text: list(text)
+        encoding.decode.side_effect = lambda tokens: "".join(tokens)
+        with patch("tiktoken.get_encoding", return_value=encoding):
+            truncated = extractor._truncate_to_tokens(long_text, 100)
+        assert len(truncated) == 100
 
     def test_parse_json_direct(self) -> None:
         extractor = GoalOrientedExtractor()

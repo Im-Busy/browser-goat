@@ -70,9 +70,9 @@ class TestVote:
     def test_single_candidate_returns_winner(self) -> None:
         voter = AnswerVoter()
         result = voter.vote(["The only answer."])
-        assert result.consensus is True
+        assert result.consensus is False
         assert result.winner_answer == "The only answer."
-        assert result.confidence == ConfidenceLevel.HIGH
+        assert result.confidence == ConfidenceLevel.LOW
 
     def test_all_different_answers_no_consensus(self) -> None:
         voter = AnswerVoter()

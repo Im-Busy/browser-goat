@@ -40,7 +40,7 @@ class AnswerVoter:
         Edge cases
         ----------
         - Empty list → ``VoteResult(consensus=False, confidence=NONE)``
-        - Single answer → winner with ``HIGH`` confidence
+        - Single answer → fallback winner, not independent consensus
         - Tie → ``consensus=False``, ``confidence=LOW``, candidates populated
         """
         if not answers:
@@ -54,9 +54,9 @@ class AnswerVoter:
 
         if len(answers) == 1:
             return VoteResult(
-                consensus=True,
+                consensus=False,
                 winner_answer=answers[0],
-                confidence=ConfidenceLevel.HIGH,
+                confidence=ConfidenceLevel.LOW,
                 vote_counts={self._normalize_answer(answers[0]): 1},
                 candidates=[],
             )

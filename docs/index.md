@@ -1,17 +1,19 @@
 # browser-goat Documentation
 
-Production-grade web search for AI agents. browser-goat wraps SearXNG with six processing stages — intent detection, hybrid ranking, anti-bot extraction, quality gating, adaptive strategy, and consensus verification — giving you agent-ready search results on your own infrastructure.
+browser-goat wraps SearXNG with query analysis, ranking, page extraction,
+quality checks, optional strategy routing, and agreement-based verification.
+Browser-backed recovery and LLM stages have separate setup requirements.
 
 ## Getting Started
 
 New to browser-goat? Start here:
 
-- **[Installation](install.md)** — pip, uv, or Docker. Get up and running in under a minute.
-- **[Quickstart](quickstart.md)** — Your first search, extraction, and MCP connection in 5 minutes.
+- **[Installation](install.md)** — Python packages and browser dependencies.
+- **[Quickstart](quickstart.md)** — First search, extraction, and MCP connection.
 
 ## Guides
 
-- **[CLI Reference](cli.md)** — Every command and flag: `search`, `extract`, `verify`, `serve`, `mcp`.
+- **[CLI Reference](cli.md)** — `search`, `extract`, `verify`, `serve`, `service`, and the separate MCP entry point.
 - **[Python Library](library.md)** — Use browser-goat as a library. Full API reference for the `BrowserGoat` class.
 - **[MCP Integration](mcp.md)** — Connect browser-goat to Claude Desktop, Cursor, OpenCode, and other AI coding tools.
 - **[Configuration](configuration.md)** — Environment variables, engine selection, language settings, and browser profiles.
@@ -30,4 +32,4 @@ pip install browser-goat
 uv add browser-goat
 ```
 
-Then make sure SearXNG is running at `http://localhost:8080`.
+Then make sure SearXNG is running at `http://localhost:8082`.

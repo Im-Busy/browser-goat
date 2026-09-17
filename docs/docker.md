@@ -8,14 +8,16 @@ Run browser-goat with SearXNG and Redis as a single stack.
 docker compose up
 ```
 
-SearXNG starts at `localhost:8080`. The browser-goat API and MCP server start at `localhost:8000`.
+SearXNG starts at `localhost:8082` on the host (container port 8080, mapped via `docker-compose.yml`). The browser-goat HTTP JSON API starts at `localhost:8003`.
+Compose does not expose an MCP endpoint. Run the stdio server separately as
+described in [MCP integration](mcp.md).
 
 ## Services
 
 | Service | Port | Description |
 |---------|------|-------------|
-| SearXNG | 8080 | Privacy-respecting metasearch engine |
-| browser-goat | 8000 | Search pipeline API and MCP server |
+| SearXNG | 8082 (host) → 8080 (container) | Privacy-respecting metasearch engine |
+| browser-goat | 8003 (host) → 8000 (container) | HTTP JSON search API, not MCP |
 | Redis | (internal) | Rate limiting and result caching, provided via Valkey 8 |
 
 ## Custom SearXNG Configuration
@@ -36,14 +38,14 @@ docker compose up --build
 ## Health Checks
 
 ```bash
-curl http://localhost:8080/health   # SearXNG
-curl http://localhost:8000/health    # browser-goat
+curl http://localhost:8082/config     # SearXNG (returns JSON config)
+curl http://localhost:8003/health      # browser-goat
 ```
 
 ## Using the API
 
 ```bash
-curl -X POST http://localhost:8000/search \
+curl -X POST http://localhost:8003/search \
   -H "Content-Type: application/json" \
   -d '{"query": "quantum computing", "max_sources": 3}'
 ```
@@ -60,3 +62,17 @@ curl -X POST http://localhost:8000/search \
 Services depend on each other with health checks. Valkey starts first. SearXNG waits for Valkey to be healthy. browser-goat waits for SearXNG to be healthy.
 
 If SearXNG fails to start, check that your `settings.yml` is valid YAML. Invalid search engine configs are the most common cause of startup failures.
+
+`All connection attempts failed` or `Cannot connect to SearXNG` indicates a
+backend connection failure, not a browser extraction failure. Check `docker
+compose ps` and `http://localhost:8082/config`; an API `/health` response only
+proves that the API listener is alive. A custom SearXNG must enable JSON in
+`search.formats` or search requests can return HTTP 403.
+
+The image copies package metadata and installs Chromium binaries plus Linux
+browser libraries for Playwright and Scrapling/Patchright. Rebuild the image
+after package or source changes. Browser launch success does not guarantee
+that a target site's anti-bot challenge can be solved.
+
+The API has no authentication. Keep the loopback port binding unless a trusted,
+authenticated reverse proxy and access policy are in place.

@@ -151,3 +151,31 @@ class TestExecute:
         )
         assert len(results) >= MultiRollout.EARLY_STOP_THRESHOLD
         assert len(results) < MultiRollout.MAX_ROLLOUTS
+
+
+async def test_caller_cancellation_drains_rollouts() -> None:
+    started = asyncio.Event()
+    active = 0
+
+    async def search(**kwargs: object) -> SearchResult:
+        nonlocal active
+        active += 1
+        started.set()
+        try:
+            await asyncio.sleep(30)
+        finally:
+            active -= 1
+        return SearchResult(answer="unused")
+
+    meta = MagicMock(search=search)
+    task = asyncio.create_task(MultiRollout().execute("Python", meta, num_rollouts=3))
+    await started.wait()
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert active == 0
+
+
+def test_small_rollout_counts_vary_engine_subsets() -> None:
+    configs = MultiRollout._generate_configs(5)
+    assert len({tuple(c.engines) for c in configs}) == 3

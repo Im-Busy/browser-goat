@@ -3,20 +3,55 @@
 Tier 1: httpx with browser profile (fastest, ~2s)
 Tier 2: Scrapling stealth mode (~5s)
 Tier 3: Scrapling with CF Turnstile solving (~15s)
-Tier 4: Playwright headful browser (~30s)
-Tier 5: Plain httpx fallback (~1s)
+Tier 4: Crawl4AI with optional proxy rotation and Shadow DOM flattening
+Tier 5: Playwright headless browser
+Tier 6: Plain httpx fallback (~1s)
 
-Ported from scraper-in-one's ScrapeRouter pattern.
+Ported from scraper-in-one's ScrapeRouter pattern; Crawl4AI tier added
+in v0.2.0 for auto anti-bot detection, Shadow DOM flattening, and
+memory-monitored browser recycling.
 """
 
 from __future__ import annotations
 
 import asyncio
+import os
 import time
+import urllib.parse
+from collections.abc import Awaitable, Callable
 
 import httpx
 
+from browser_goat.extraction.response_acceptance import accept_response
 from browser_goat.models import BrowserProfile, FetchResult
+
+# Maximum time a single tier may block before the next tier is attempted.
+TIER_BUDGET_SECONDS = 15.0
+
+
+def _validate_url(url: str) -> tuple[bool, str]:
+    """Validate URL syntactically before any network call.
+
+    This is the early-exit gate that prevents the 6-tier cascade from
+    burning 14-60s on obviously-invalid inputs like "not-a-url".
+
+    Returns (ok, error_message).
+    """
+    if not url or not isinstance(url, str):
+        return False, "url must be a non-empty string"
+    try:
+        parsed = urllib.parse.urlparse(url)
+    except (ValueError, TypeError) as exc:
+        return False, f"malformed url: {exc}"
+    if parsed.scheme not in ("http", "https"):
+        return False, f"unsupported scheme {parsed.scheme!r}; must be http:// or https://"
+    if not parsed.hostname:
+        return False, "missing hostname"
+    try:
+        _ = parsed.port
+    except ValueError as exc:
+        return False, f"invalid port: {exc}"
+    return True, ""
 
 
 class ScraplingFetcher:
@@ -29,10 +64,23 @@ class ScraplingFetcher:
         self,
         timeout: float = 30.0,
         max_retries: int = 2,
+        proxy_pool: list[str] | None = None,
+        enable_crawl4ai: bool = True,
     ) -> None:
         self.timeout = timeout
         self.max_retries = max_retries
+        self.proxy_pool = (
+            proxy_pool
+            if proxy_pool is not None
+            else [
+                p.strip()
+                for p in os.environ.get("CRAWL4AI_PROXY_LIST", "").split(",")
+                if p.strip()
+            ]
+        )
+        self.enable_crawl4ai = enable_crawl4ai
         self._client: httpx.AsyncClient | None = None
+        self._crawl4ai_round_robin = 0
 
     async def _get_client(self) -> httpx.AsyncClient:
         if self._client is None:
@@ -64,41 +112,44 @@ class ScraplingFetcher:
         """
         start = time.monotonic()
 
-        # Tier 1: httpx with browser profile headers
-        result = await self._try_httpx(url, browser_profile)
-        if result.success:
-            result.fetch_tier = 1
-            result.latency_ms = int((time.monotonic() - start) * 1000)
-            return result
+        # ── Early-exit gate (Bug #1 fix) ─────────────────────────────────────
+        # Validate the URL syntactically before any network call. This
+        # prevents the 6-tier cascade from burning 14-60s on invalid input.
+        ok, err = _validate_url(url)
+        if not ok:
+            return FetchResult(
+                url=url,
+                success=False,
+                error=err,
+                fetch_tier=0,
+                latency_ms=int((time.monotonic() - start) * 1000),
+            )
 
-        # Tier 2: Scrapling stealth mode
-        result = await self._try_scrapling(url, stealth=True)
-        if result.success:
-            result.used_scrapling = True
-            result.fetch_tier = 2
+        # Create each coroutine only when its tier is reached.
+        tiers: list[tuple[int, Callable[[], Awaitable[FetchResult]]]] = [
+            (1, lambda: self._try_httpx(url, browser_profile)),
+            (2, lambda: self._try_scrapling(url, stealth=True)),
+            (3, lambda: self._try_scrapling(url, stealth=True, cf_bypass=True)),
+        ]
+        if self.enable_crawl4ai:
+            tiers.append((4, lambda: self._try_crawl4ai(url)))
+        tiers.extend([(5, lambda: self._try_playwright(url)), (6, lambda: self._try_httpx(url, None))])
+        for tier, fetch in tiers:
+            result = accept_response(await self._bounded_tier(url, fetch()))
+            result.fetch_tier = tier
             result.latency_ms = int((time.monotonic() - start) * 1000)
-            return result
-
-        # Tier 3: Scrapling with CF Turnstile
-        result = await self._try_scrapling(url, stealth=True, cf_bypass=True)
-        if result.success:
-            result.used_scrapling = True
-            result.fetch_tier = 3
-            result.latency_ms = int((time.monotonic() - start) * 1000)
-            return result
-
-        # Tier 4: Playwright headful
-        result = await self._try_playwright(url)
-        if result.success:
-            result.fetch_tier = 4
-            result.latency_ms = int((time.monotonic() - start) * 1000)
-            return result
-
-        # Tier 5: Plain httpx (no profile)
-        result = await self._try_httpx(url, None)
-        result.fetch_tier = 5
-        result.latency_ms = int((time.monotonic() - start) * 1000)
+            if result.success:
+                result.used_scrapling = tier in (2, 3)
+                result.used_crawl4ai = tier == 4
+                return result
         return result
+
+    async def _bounded_tier(self, url: str, fetch: Awaitable[FetchResult]) -> FetchResult:
+        """Bound a tier, including its retry sleeps, without swallowing cancellation."""
+        try:
+            return await asyncio.wait_for(fetch, timeout=min(self.timeout, TIER_BUDGET_SECONDS))
+        except TimeoutError:
+            return FetchResult(url=url, error="Fetch tier timed out")
 
     async def _try_httpx(
         self, url: str, profile: BrowserProfile | None
@@ -110,13 +161,13 @@ class ScraplingFetcher:
         for attempt in range(self.max_retries + 1):
             try:
                 response = await client.get(url, headers=headers)
-                if response.status_code == 200:
-                    return FetchResult(
+                if 200 <= response.status_code < 300:
+                    return accept_response(FetchResult(
                         url=url,
                         html=response.text,
-                        status_code=200,
+                        status_code=response.status_code,
                         success=True,
-                    )
+                    ))
                 elif response.status_code in (403, 429, 503):
                     if attempt < self.max_retries:
                         await asyncio.sleep(1 * (attempt + 1))
@@ -158,22 +209,24 @@ class ScraplingFetcher:
         and Cloudflare Turnstile solving.
         """
         try:
-            from scrapling import StealthyFetcher  # type: ignore[import-untyped,unused-ignore]
+            from scrapling.fetchers import StealthyFetcher
         except ImportError:
-            return FetchResult(url=url, success=False, error="scrapling not installed")
+            return FetchResult(url=url, success=False, error="scrapling fetcher dependencies not installed")
 
         try:
-            fetcher = StealthyFetcher(auto_match=False)  # type: ignore[no-untyped-call]
-            page = await fetcher.async_fetch(url)  # type: ignore[attr-defined,unused-ignore]
+            page = await StealthyFetcher.async_fetch(
+                url, headless=True, solve_cloudflare=cf_bypass,
+                timeout=int(self.timeout * 1000),
+            )
 
-            if page and page.status == 200:
-                return FetchResult(
+            if page is not None and 200 <= page.status < 300:
+                return accept_response(FetchResult(
                     url=url,
-                    html=str(page.content),  # type: ignore[attr-defined]
-                    status_code=200,
+                    html=page.body.decode("utf-8", errors="replace"),
+                    status_code=page.status,
                     success=True,
                     used_scrapling=True,
-                )
+                ))
 
             return FetchResult(
                 url=url,
@@ -188,8 +241,57 @@ class ScraplingFetcher:
                 error=f"Scrapling error: {exc}",
             )
 
+    async def _try_crawl4ai(self, url: str) -> FetchResult:
+        """Fetch with Crawl4AI's Shadow DOM flattening and optional round-robin proxy."""
+        try:
+            from crawl4ai import (  # type: ignore[import-untyped]  # upstream has no typing marker
+                AsyncWebCrawler,
+                BrowserConfig,
+                CrawlerRunConfig,
+            )
+        except ImportError:
+            return FetchResult(url=url, success=False, error="crawl4ai not installed")
+
+        proxy = None
+        if self.proxy_pool:
+            proxy = self.proxy_pool[self._crawl4ai_round_robin % len(self.proxy_pool)]
+            self._crawl4ai_round_robin += 1
+
+        try:
+            config = CrawlerRunConfig(
+                flatten_shadow_dom=True, proxy_config=proxy,
+                page_timeout=int(self.timeout * 1000), verbose=False,
+            )
+            async with AsyncWebCrawler(config=BrowserConfig(headless=True, verbose=False)) as crawler:
+                result = await crawler.arun(url=url, config=config)
+
+            html = getattr(result, "html", None) or getattr(result, "content", None)
+            status = getattr(result, "status_code", None) or 0
+            success = getattr(result, "success", bool(html))
+
+            if success:
+                return accept_response(FetchResult(
+                    url=url,
+                    html=str(html or ""),
+                    status_code=int(status),
+                    success=True,
+                ))
+
+            return FetchResult(
+                url=url,
+                status_code=int(status) if status else 0,
+                success=False,
+                error="Crawl4AI returned no usable content",
+            )
+        except Exception as exc:
+            return FetchResult(
+                url=url,
+                success=False,
+                error=f"Crawl4AI error: {exc}",
+            )
+
     async def _try_playwright(self, url: str) -> FetchResult:
-        """Try fetching with Playwright headful browser (last resort)."""
+        """Try fetching with Playwright headless browser (last resort)."""
         try:
             from playwright.async_api import async_playwright
         except ImportError:
@@ -198,16 +300,19 @@ class ScraplingFetcher:
         try:
             async with async_playwright() as pw:
                 browser = await pw.chromium.launch(headless=True)
-                page = await browser.new_page()
-                await page.goto(url, wait_until="domcontentloaded", timeout=self.timeout * 1000)
-                html = await page.content()
-                await browser.close()
-                return FetchResult(
+                try:
+                    page = await browser.new_page()
+                    response = await page.goto(url, wait_until="domcontentloaded", timeout=self.timeout * 1000)
+                    html = await page.content()
+                    status = response.status if response is not None else 0
+                finally:
+                    await browser.close()
+                return accept_response(FetchResult(
                     url=url,
                     html=html,
-                    status_code=200,
+                    status_code=status,
                     success=True,
-                )
+                ))
         except Exception as exc:
             return FetchResult(
                 url=url,

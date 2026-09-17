@@ -69,7 +69,14 @@ class GoalOrientedExtractor:
         self._llm_call = llm_call
         self.max_tokens = max_tokens
         self.fallback_tokens = fallback_tokens
-        self._tokenizer = tiktoken.get_encoding("cl100k_base")
+        self._encoding: tiktoken.Encoding | None = None
+
+    @property
+    def _tokenizer(self) -> tiktoken.Encoding:
+        # Basic extraction must not download a tokenizer or require an LLM service.
+        if self._encoding is None:
+            self._encoding = tiktoken.get_encoding("cl100k_base")
+        return self._encoding
 
     async def extract(
         self,
@@ -116,6 +123,8 @@ class GoalOrientedExtractor:
 
             # Parse JSON from response
             parsed = self._parse_json(raw_response)
+            if not parsed:
+                raise ValueError("LLM returned no extraction fields")
 
             base.rational = parsed.get("rational", "")
             base.evidence = parsed.get("evidence", "")
@@ -158,7 +167,10 @@ class GoalOrientedExtractor:
         """Parse JSON from LLM response, handling markdown code blocks."""
         # Try direct JSON parse
         try:
-            return typing.cast("dict[str, str]", json.loads(text))
+            data = json.loads(text)
+            if isinstance(data, dict) and all(isinstance(v, str) for v in data.values()):
+                return typing.cast("dict[str, str]", data)
+            return {}
         except json.JSONDecodeError:
             pass
 
@@ -167,7 +179,7 @@ class GoalOrientedExtractor:
             match = re.search(pattern, text, re.DOTALL)
             if match:
                 try:
-                    return typing.cast("dict[str, str]", json.loads(match.group(1)))
+                    return self._parse_json(match.group(1) if match.lastindex else match.group(0))
                 except (json.JSONDecodeError, IndexError):
                     continue
 

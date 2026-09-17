@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "browser-goat": {
+      "command": "uvx",
+      "args": ["--from", "browser-goat", "browser-goat-mcp", "--searxng-url", "http://localhost:8082"],
+      "env": {}
+    }
+  }
+}
