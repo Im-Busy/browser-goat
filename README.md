@@ -62,7 +62,9 @@ asyncio.run(main())
 - `explore` merges results from multiple query variants before ranking. Without
   an LLM, it uses the direct query and available rule-based synonyms.
 - `decompose` uses an explicitly supplied library chat callback for recursive
-  subtasks. Without that callback, it falls back to the default search path.
+  subtasks and synthesis from SearXNG result snippets. The router extracts
+  pages after that synthesis. Without the callback, it falls back to the
+  default search path.
 - `auto` chooses a strategy from query classification.
 - `high` requests five rollouts; `maximum` requests eight. Four matching
   normalized answers can stop remaining work. A plurality is retained even
@@ -82,7 +84,9 @@ asyncio.run(main())
   collection deadline. One completed answer remains a non-consensus fallback.
 - Verification measures agreement, **not factual truth**. Failed quality
   checks are excluded from voting. A single surviving answer is not consensus.
-- No LLM is required. Ordinary answers list extracted source summaries.
+- No LLM is required. Default and explore answers list up to five sources,
+  with up to 200 characters of each summary. Without a library chat callback,
+  those summaries are excerpts of extracted text.
   `BROWSER_GOAT_LLM` optionally configures verification tie-breaking; it does
   not enable decomposition or extraction enrichment. No configured LLM means
   tie-breaking is reported as `fallback`, not `llm`.
@@ -118,12 +122,17 @@ rotation through `CRAWL4AI_PROXY_LIST`; no proxy service is bundled.
 | Variable | Default | Purpose |
 |---|---|---|
 | `SEARXNG_URL` | `http://localhost:8082` | Search backend |
-| `CONTENT_CACHE_TTL_SECONDS` | `900` | In-process HTML cache TTL; `0` disables reuse |
+| `CONTENT_CACHE_TTL_SECONDS` | `900` | Per-instance in-memory HTML cache TTL; `0` disables reuse |
 | `CONTENT_CACHE_MAX_ENTRIES` | `256` | LRU entry limit; `0` disables storage |
 | `CRAWL4AI_PROXY_LIST` | empty | Comma-separated proxy URLs for the Crawl4AI tier |
 | `BROWSER_GOAT_LLM` | empty | Optional verifier provider, such as `ollama:llama3` |
 | `BROWSER_GOAT_OLLAMA_HOST` | `http://localhost:11434` | Ollama endpoint |
 | `BROWSER_GOAT_OPENAI_API_KEY` | empty | Optional OpenAI verifier credential |
+
+Search and extraction share accepted HTML and in-flight fetches within one
+`BrowserGoat` instance. Separate CLI processes do not share this cache; it
+stores neither answers nor search results. Compose's Valkey service is the
+separate SearXNG Redis backend.
 
 Native `serve` and `service start` bind to `127.0.0.1` by default. Docker's
 explicit internal `0.0.0.0` binding remains behind a loopback Compose host port.

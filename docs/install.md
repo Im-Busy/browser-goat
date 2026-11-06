@@ -3,11 +3,8 @@
 ## Prerequisites
 
 * Python 3.13 or later
-* SearXNG running (Docker is the quickest way):
-
-```bash
-docker compose up -d redis searxng
-```
+* SearXNG with JSON search enabled for search and verification; extraction alone
+  does not require it.
 
 Check your Python version before proceeding:
 
@@ -15,7 +12,27 @@ Check your Python version before proceeding:
 python --version
 ```
 
-## pip
+## Source checkout
+
+From the repository root, install the locked checkout dependencies and start
+the bundled search backend:
+
+```bash
+uv sync --locked
+docker compose up -d redis searxng
+uv run browser-goat --version
+```
+
+The Compose file and bundled SearXNG settings belong to this checkout. Docker
+commands in this guide assume that working directory. Install the browser
+binaries below before using browser-backed fetch tiers.
+
+## Package index
+
+These commands require an available published Python package. Its revision
+may differ from the source checkout.
+
+### pip
 
 ```bash
 pip install browser-goat
@@ -23,7 +40,7 @@ pip install browser-goat
 
 The package and all its dependencies land in your current environment.
 
-## uv
+### uv
 
 ```bash
 uv add browser-goat

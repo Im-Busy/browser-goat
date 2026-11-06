@@ -1,6 +1,8 @@
 # browser-goat — MCP Server
 
-MCP (Model Context Protocol) server for [browser-goat](https://github.com/Im-Busy/browser-goat), a meta-layer search intelligence wrapper for SearXNG.
+Node.js launcher for the Python MCP (Model Context Protocol) stdio server in
+[browser-goat](https://github.com/Im-Busy/browser-goat), a SearXNG search,
+ranking, and page-extraction pipeline with optional answer voting.
 
 This npm package is a **thin bridge** — it spawns the Python `browser-goat-mcp` backend and proxies MCP stdio communication. All search logic lives in the Python package.
 

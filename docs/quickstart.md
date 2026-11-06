@@ -1,12 +1,14 @@
 # Quickstart
 
-Get your first result in 5 minutes.
+Run these commands from a source checkout.
 
 ## Prerequisites
 
-A running SearXNG instance. Start one with Docker:
+Install Python 3.13+, uv, and Docker with Compose. Sync the checkout and start
+the bundled SearXNG backend, which enables JSON search:
 
 ```bash
+uv sync --locked
 docker compose up -d redis searxng
 ```
 
@@ -15,56 +17,64 @@ docker compose up -d redis searxng
 Search the web from your terminal:
 
 ```bash
-browser-goat search "latest developments in quantum computing"
+uv run browser-goat search "Python asyncio documentation" --max-sources 2
 ```
 
-A single command runs the full pipeline and returns a synthesized answer with citations.
+The default search returns JSON containing source links, bounded text excerpts,
+an answer listing up to five source summaries, quality checks, and metrics.
+It does not synthesize a narrative answer. See
+[behavior and limits](../README.md#behavior-and-limits) for the optional library
+callback and verification modes.
 
 ## CLI Extraction
 
-Pull clean content from any URL:
+Fetch and extract text from an HTTP or HTTPS URL:
 
 ```bash
-browser-goat extract "https://example.com"
+uv run browser-goat extract "https://example.com"
 ```
 
-Returns full extracted plain text in JSON. Browser-backed tiers attempt
-anti-bot recovery when installed; access is not guaranteed.
+Returns extracted text or an explicit failure in JSON. Extraction does not
+require SearXNG. Browser-backed tiers need the binaries and system libraries
+listed in [installation](install.md); access to a site is not guaranteed.
 
 ## Library Usage
 
-Drop browser-goat into any Python project:
+Run this example in the prepared checkout environment:
 
 ```python
+import asyncio
 from browser_goat import BrowserGoat
 
-async with BrowserGoat(searxng_url="http://localhost:8082") as goat:
-    result = await goat.search("Python async patterns")
-    print(result.answer)
-```
+async def main() -> None:
+    async with BrowserGoat(searxng_url="http://localhost:8082") as goat:
+        result = await goat.search("Python async patterns", max_sources=2)
+        print(result.answer)
 
-Async from the ground up — pairs naturally with httpx, FastAPI, or any modern stack.
+asyncio.run(main())
+```
 
 ## MCP Connection
 
-Wire it into your AI agent's MCP config:
+For a client supporting `mcpServers`, launch the prepared checkout. Replace
+`/path/to/browser-goat` with its absolute path:
 
 ```json
 {
   "mcpServers": {
     "browser-goat": {
-      "command": "npx",
-      "args": ["browser-goat"],
+      "command": "uv",
+      "args": ["run", "--project", "/path/to/browser-goat", "browser-goat-mcp"],
       "env": { "SEARXNG_URL": "http://localhost:8082" }
     }
   }
 }
 ```
 
-Your agent can now run searches and extract pages without leaving its MCP session.
-The npm wrapper requires Python with `browser-goat` installed. Set `PYTHON_CMD`
-to that interpreter; see [npm prerequisites](../npm/README.md).
+The client communicates over stdio. SearXNG uses host port `8082`; the separate
+Compose HTTP JSON API uses `8003` and is not an MCP endpoint. Client schemas
+differ; see [MCP integration](mcp.md) before adapting this example.
 
----
-
-**What's next:** Dive deeper with the [CLI Reference](cli.md), [Python Library](library.md), or [MCP Integration](mcp.md) guide.
+For registry launchers, see [installation](install.md) and
+[npm prerequisites](../npm/README.md). A registry install does not establish
+that it contains this checkout's revision.

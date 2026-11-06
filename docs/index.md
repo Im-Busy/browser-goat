@@ -21,10 +21,14 @@ New to browser-goat? Start here:
 
 ## Reference
 
-- **[Architecture](architecture.md)** — How the six-stage pipeline works, from query to answer.
+- **[Architecture](architecture.md)** — Search, extraction, optional strategy routing, verification, and the per-instance HTML cache.
 - **[GitHub Repository](https://github.com/Im-Busy/browser-goat)** — Source code, issues, and contributing.
 
 ## Quick Install
+
+From a source checkout, use `uv sync --locked`, then follow the
+[quickstart](quickstart.md). Package-index commands below require an available
+published package and may select a different revision:
 
 ```bash
 pip install browser-goat

@@ -9,7 +9,8 @@ Two commands are installed when you install the package:
 | `browser-goat` | `browser_goat.cli:main` | Full CLI with search, extract, verify, and serve subcommands |
 | `browser-goat-mcp` | `browser_goat.mcp_server:main` | MCP stdio server for AI agent consumption |
 
-Both can run via `uvx` for zero-install usage:
+Both can run in an isolated tool environment via `uvx` when the Python package
+is available from the registry. These commands do not select the local checkout:
 
 ```bash
 uvx browser-goat search "your query"
@@ -85,7 +86,9 @@ browser-goat search "climate change" --searxng-url http://my-searxng:8080 --form
 
 ## `browser-goat extract`
 
-Fetches a single URL and extracts content using the cascading extractor with anti-bot bypass.
+Fetches a single URL and extracts text through the cascading extractor.
+Browser-backed recovery needs the dependencies and browser binaries in
+[installation](install.md). Access and anti-bot recovery are not guaranteed.
 
 ```
 browser-goat extract URL [OPTIONS]
@@ -150,10 +153,15 @@ browser-goat verify QUERY [OPTIONS]
 | `--rollouts` | `int` | `5` | 3-8 | Requested parallel search rollouts |
 | `--format` | `str` | `json` | `json`, `pretty` | Output format |
 
-The exact requested count is honored unless four matching answers stop pending
-work. `rollouts_run` and `verification.rollout_count` report actual completions.
+The command requests the specified count. Early consensus, failures, or the
+40-second shared collection budget can reduce completions. Cancellation cleanup
+can add latency beyond that budget. `rollouts_run` and
+`verification.rollout_count` report actual completions.
 The result includes `vote_counts` and `candidates`. More than five rollouts
 permit the optional LLM tie-breaker; no LLM means a labeled fallback.
+Four answers matching after outer-whitespace trimming and lowercasing establish
+consensus; the voter does not compare meanings. See
+[partial results](mcp.md#verification-deadline-and-partial-results) for metadata.
 
 ### Examples
 
@@ -252,7 +260,7 @@ browser-goat-mcp [OPTIONS]
 | Tool | Description |
 |------|-------------|
 | `search` | Full pipeline with query, time_range, and max_sources parameters |
-| `extract` | Fetch and extract a single URL with anti-bot bypass |
+| `extract` | Fetch and extract a single URL with best-effort browser recovery |
 | `verify` | Request 3-8 rollouts and return vote and fallback metadata |
 
 ### MCP Client Configuration
@@ -301,7 +309,7 @@ With `npx` (requires Python with browser-goat installed; `PYTHON_CMD` selects th
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `SEARXNG_URL` | `http://localhost:8082` | SearXNG instance URL (used by the npx MCP wrapper) |
+| `SEARXNG_URL` | `http://localhost:8082` | Default SearXNG URL for the library, CLI, MCP server, and npm launcher |
 
 The `--searxng-url` flag on all CLI commands sets the same value directly and takes precedence over the environment variable.
 

@@ -2,7 +2,9 @@
 
 ## BrowserGoat
 
-`BrowserGoat` is the main entry point. It orchestrates a six-layer search pipeline around a SearXNG instance: query analysis, search, ranking, extraction, reliability checks, optional strategy routing, and optional multi-rollout verification.
+`BrowserGoat` is the main entry point for query analysis, SearXNG search,
+ranking, page extraction, and quality checks. Strategy routing and
+multi-rollout verification wrap that path; they are optional.
 
 ```python
 from browser_goat import BrowserGoat
@@ -22,7 +24,7 @@ BrowserGoat(
 | Parameter | Type | Default | Description |
 |---|---|---|---|
 | `searxng_url` | `str \| None` | `None` | Explicit URL, otherwise `SEARXNG_URL`, otherwise `http://localhost:8082`. |
-| `llm_call` | `Any` | `None` | Optional async callable for LLM-powered goal-oriented extraction. When provided, extracted sources include structured rational/evidence/summary fields. When omitted, extraction runs without LLM enrichment. |
+| `llm_call` | `Any` | `None` | Optional async chat callback for extraction enrichment, classification, exploration, decomposition, and verification. Without it, source fields contain text excerpts and decomposition falls back to default search. |
 | `cache_ttl_seconds` | `float \| None` | `None` | Override `CONTENT_CACHE_TTL_SECONDS` (default 900); non-negative. |
 | `cache_max_entries` | `int \| None` | `None` | Override `CONTENT_CACHE_MAX_ENTRIES` (default 256); non-negative. |
 
@@ -48,7 +50,9 @@ async def search(
 ) -> SearchResult
 ```
 
-Execute a full search through every active pipeline layer. Returns a `SearchResult` with the synthesized answer, extracted sources, and pipeline metrics.
+Return a `SearchResult` with an answer, extracted sources, and pipeline metrics.
+Default and explore answers list up to five sources and up to 200 characters
+of each summary. Without `llm_call`, the summaries use extracted-text excerpts.
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
@@ -64,10 +68,10 @@ Execute a full search through every active pipeline layer. Returns a `SearchResu
 
 | Value | Behavior |
 |---|---|
-| `"default"` | Standard pipeline: pre-search → SearXNG → ranking → extraction → reliability. One pass, fastest result. |
+| `"default"` | One search pass: query analysis, SearXNG, ranking, extraction, and quality checks. |
 | `"auto"` | Classify the query, then route to `"explore"` (for research queries), `"decompose"` (for complex/puzzle queries), or `"default"` (everything else). |
 | `"explore"` | Multi-angle adaptive exploration. Generates and searches candidate query variations, then merges the best results. |
-| `"decompose"` | Recursive decomposition with `llm_call`; falls back to default search without it. |
+| `"decompose"` | Recursive subtasks and LLM synthesis from SearXNG result snippets with `llm_call`. The router then extracts the collected pages. Falls back to default search without the callback. |
 | `"direct"` | Alias for `"default"`. |
 
 #### Reliability modes
@@ -83,7 +87,7 @@ Execute a full search through every active pipeline layer. Returns a `SearchResu
 
 | Field | Type | Description |
 |---|---|---|
-| `answer` | `str` | Synthesized answer string built from extracted sources. Includes source citations in `[N]` format. |
+| `answer` | `str` | Default/explore source listing with `[N]` links and summary excerpts; decomposition can return a callback-generated answer based on search snippets. |
 | `sources` | `list[ExtractedSource]` | Fully processed sources after extraction and enrichment. See [ExtractedSource](#extractedsource). |
 | `query_intent` | `QueryIntent` | Classified intent: `FACTUAL`, `TEMPORAL`, `PERSON`, `COMPARISON`, `HOWTO`, or `RESEARCH`. |
 | `engines_used` | `list[str]` | SearXNG engine names used for this search. |
@@ -92,6 +96,7 @@ Execute a full search through every active pipeline layer. Returns a `SearchResu
 | `extraction_success_rate` | `float` | Fraction of ranked URLs whose page content was successfully fetched and extracted. Range 0.0 to 1.0. |
 | `pipeline_latency_ms` | `int` | Total pipeline wall-clock time in milliseconds. |
 | `reliability` | `ReliabilityInfo` | Aggregated reliability checks. See [ReliabilityInfo](#reliabilityinfo). |
+| `verification` | `VerificationResult \| None` | Vote outcome and collection/deadline metadata for a verified search; otherwise `None`. |
 | `timestamp` | `str` | ISO 8601 timestamp of when the result was created. |
 
 ---
@@ -110,8 +115,8 @@ async def extract(url: str) -> dict[str, Any]
 |---|---|---|
 | `url` | `str` | The URL that was fetched. |
 | `title` | `str` | Page title extracted from `<title>` or structured metadata. Empty string if none found. |
-| `text` | `str` | Clean article text. Site chrome, navigation, ads, and sidebars are stripped. |
-| `extraction_tier` | `int` | Which of the 7 extraction tiers succeeded. Tier 1 (JSON-LD structured data) is fastest. Tier 7 (full body fallback) is last resort. |
+| `text` | `str` | Extracted page text. Later fallback tiers can retain navigation or other site text. |
+| `extraction_tier` | `int` | First successful text-extraction tier, from 1 (JSON-LD) through 7 (body fallback). Tier order is not a measured speed or quality guarantee. |
 | `text_length` | `int` | Length of the full returned text. |
 | `success` | `bool` | False when fetching fails or no text can be extracted. |
 | `error` | `str \| None` | Failure description. Fetch failures omit the text fields. |
@@ -124,6 +129,12 @@ search-result fields plus `query`, `rollouts_run`, `vote_counts`, and
 and the method (`consensus`, `llm`, `fallback`, or `rollout_failure`). Failed
 quality checks are not votes; one surviving result is not consensus. The
 selected answer retains its own source list and metrics.
+
+Voting groups answers by exact text after trimming outer whitespace and
+lowercasing. Four matching answers establish consensus. Collection and optional
+tie-breaking share a 40-second budget; failures and the deadline can reduce
+completions. Pending work is cancelled and drained, which can add latency.
+See [verification metadata](mcp.md#verification-deadline-and-partial-results).
 
 `goat.cache_stats()` returns hits, misses, size, capacity, TTL, and hit rate.
 `goat.clear_cache()` clears cached HTML and resets counters.
@@ -179,11 +190,11 @@ A single processed search result after extraction and enrichment. Each source in
 |---|---|---|
 | `url` | `str` | Source URL. |
 | `title` | `str` | Page title. |
-| `rational` | `str` | Why this page is relevant to the query. Populated when `llm_call` is configured. |
-| `evidence` | `str` | Specific text passages from the page that answer the query. Populated when `llm_call` is configured. |
-| `summary` | `str` | Condensed 2-3 sentence summary of the page content. |
-| `extraction_tier` | `int` | Which extraction tier succeeded (1-7). Lower tiers produce higher-quality content. |
-| `used_scrapling` | `bool` | Whether anti-bot bypass was required to fetch this page. |
+| `rational` | `str` | Callback-generated rationale, or a generic relevance message on the no-LLM/fallback path. |
+| `evidence` | `str` | Callback-generated evidence, or up to 2,000 characters of extracted text on the no-LLM/fallback path. |
+| `summary` | `str` | Callback-generated summary, or up to 500 characters of extracted text on the no-LLM/fallback path. |
+| `extraction_tier` | `int` | First successful text-extraction tier (1-7); not a quality score. |
+| `used_scrapling` | `bool` | True when the fetch reports Scrapling or Crawl4AI use. False for cache hits; not proof that anti-bot bypass was necessary or successful. |
 | `rank` | `int` | Position in the ranked results (1-indexed). |
 | `final_score` | `float` | Composite relevance score from the hybrid ranker. |
 | `engine` | `str` | SearXNG engine that returned this result (e.g. `"google"`, `"bing"`). |
@@ -274,14 +285,15 @@ async def main() -> None:
             if source.summary:
                 print(f"    {source.summary[:120]}...")
 
-        # With strategy and verification
+        # Request voting across multiple searches.
         result2 = await goat.search(
             "compare Kubernetes and Docker Swarm for small teams",
-            strategy="decompose",
+            strategy="explore",
             reliability_mode="high",
             time_range="year",
         )
-        print(f"\nVerified answer (consensus): {result2.answer[:200]}...")
+        print(result2.answer[:200])
+        print(result2.verification)
 
 asyncio.run(main())
 ```

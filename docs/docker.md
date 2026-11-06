@@ -18,7 +18,12 @@ described in [MCP integration](mcp.md).
 |---------|------|-------------|
 | SearXNG | 8082 (host) → 8080 (container) | Privacy-respecting metasearch engine |
 | browser-goat | 8003 (host) → 8000 (container) | HTTP JSON search API, not MCP |
-| Redis | (internal) | Rate limiting and result caching, provided via Valkey 8 |
+| Redis | (internal) | Valkey 8, configured as SearXNG's Redis backend |
+
+The browser-goat HTML cache is separate: it lives in memory in each
+`BrowserGoat` instance, with a default TTL of 900 seconds and a 256-entry limit.
+Valkey and its volume do not persist that cache or browser-goat answers.
+The bundled SearXNG settings have `server.limiter: false`.
 
 ## Custom SearXNG Configuration
 
@@ -33,7 +38,9 @@ docker compose up --build
 - Change `SEARXNG_SECRET_KEY` in `.env` to a random value.
 - Edit `server.limiter` in `docker/searxng/settings.yml` to adjust rate limiting.
 - Put a reverse proxy (nginx, Caddy) in front for HTTPS.
-- Set `SEARXNG_BASE_URL` to your public-facing domain.
+- For a public-facing SearXNG deployment, edit its `SEARXNG_BASE_URL` value in
+  `docker-compose.yml`. The supplied Compose file sets it directly; it does
+  not read a host `SEARXNG_BASE_URL` override.
 
 ## Health Checks
 
@@ -55,7 +62,7 @@ curl -X POST http://localhost:8003/search \
 | Volume | Purpose |
 |--------|---------|
 | `valkey-data` | Redis/Valkey persistent data |
-| `searxng-cache` | SearXNG result cache |
+| `searxng-cache` | SearXNG data mounted at `/var/cache/searxng` |
 
 ## Troubleshooting
 

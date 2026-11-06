@@ -51,17 +51,23 @@ unconditional sequential stages.
 |---|---|
 | `default` or `direct` | Run one search pass with ranking, extraction, and quality checks. |
 | `explore` | Merge results from query variants before ranking. Without an LLM callback, use the direct query and available rule-based synonyms. |
-| `decompose` | Use an explicit library chat callback to split and aggregate subtasks. Without the callback, fall back to default search. |
+| `decompose` | Use an explicit library chat callback to split subtasks and synthesize from SearXNG snippets. Extract collected pages afterward. Without the callback, fall back to default search. |
 | `auto` strategy | Choose a strategy from query classification. |
 | `high` reliability | Request five rollouts and vote across usable answers. |
 | `maximum` reliability | Request eight rollouts; differing candidates can use an optional configured verifier. |
 
-Four matching normalized answers establish consensus and can stop pending
-rollouts. Answers that fail quality checks do not vote. Lower-count pluralities
-remain fallback results, not consensus. Results report actual completed
-rollouts, preserve caller search constraints, and retain the selected answer's
+Four answers matching after trimming outer whitespace and lowercasing establish
+consensus and can stop pending rollouts. Answers that fail quality checks do
+not vote. Lower-count pluralities remain fallback results, not consensus.
+Results report actual completed rollouts, preserve caller search constraints,
+and retain the selected answer's
 sources. Pending rollout tasks are cancelled and awaited on early stop or
 caller cancellation.
+
+This is exact text agreement after that normalization, not semantic matching.
+Default and explore answers list up to five sources with bounded summary
+excerpts. Decomposition's snippet-based synthesis is separate from the
+router's later page extraction and optional enrichment.
 
 `BROWSER_GOAT_LLM` configures the optional verification provider. It does not
 supply the library chat callback needed for decomposition or extraction

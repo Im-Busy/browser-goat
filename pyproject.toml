@@ -1,7 +1,7 @@
 [project]
 name = "browser-goat"
 version = "0.2.1"
-description = "Agent-native search pipeline — intent-aware querying, hybrid ranking, anti-bot extraction, and consensus verification wrapped around SearXNG."
+description = "SearXNG search pipeline with query analysis, hybrid ranking, page extraction, optional answer voting, and Python, CLI, HTTP JSON and MCP stdio interfaces."
 requires-python = ">=3.13"
 license = "MIT"
 license-files = ["LICENSE"]
